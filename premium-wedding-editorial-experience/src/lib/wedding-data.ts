@@ -1,5 +1,23 @@
 export type WeddingStatus = "interested" | "contacted" | "chosen";
 
+/** Canonical functional progression used by Mon mariage (not a calendar). */
+export const weddingMomentOrder = [
+  "Avant le mariage",
+  "Veille du mariage",
+  "Préparatifs",
+  "Cérémonie",
+  "Cocktail",
+  "Couple",
+  "Dîner",
+  "Première danse",
+  "Soirée",
+  "Lendemain",
+  "Brunch",
+  "Après le mariage",
+] as const;
+
+export type WeddingMoment = (typeof weddingMomentOrder)[number];
+
 export type Subject = {
   id: string;
   coverNumber: number;
@@ -39,25 +57,25 @@ const pro = (name: string, role: string, city: string) => ({ name, role, city })
 
 export const subjects: Subject[] = [
   {
-    id: "saxophoniste", coverNumber: 1, title: "Saxophoniste", eyebrow: "Le détail qui change l’air", universe: "Musique", category: "Live", type: "Métier", style: "Solaire", budget: "Signature", image: images[0],
+    id: "saxophoniste", coverNumber: 1, title: "Saxophoniste", eyebrow: "Le détail qui change l’air", universe: "Musique", category: "Live", type: "Métier", style: "Solaire", budget: "Signature", image: "/covers/001-saxophoniste.jpg",
     intro: "Une présence live, libre et immédiate — du premier verre à la dernière danse.",
     description: "Le saxophoniste ne définit pas une ambiance à lui seul. Il la fait respirer. En solo à la cérémonie, au milieu des invités pendant le cocktail ou aux côtés d’un DJ, il introduit une chaleur organique dans les temps forts de la journée.",
     moments: ["Cérémonie", "Cocktail", "Dîner", "Première danse", "Soirée"], services: ["Prestation live", "Set cocktail", "Cérémonie sur mesure", "Accompagnement DJ", "Intervention surprise"], brings: ["Une émotion immédiate", "Un rythme vivant", "Une transition mémorable"], toPlan: ["L’espace de jeu", "Les accès", "Les horaires d’intervention", "Le répertoire"], constraints: ["Sonorisation éventuelle", "Alimentation électrique", "Niveau sonore autorisé"], resources: ["Espace scène", "Prise électrique", "Système audio"], related: ["dj", "chateau", "ceremonie-laique", "eclairage"], professionals: [pro("Léo Hartmann", "Saxophoniste live", "Paris"), pro("Golden Notes", "Collectif musical", "Lyon")]
   },
   {
-    id: "chateau", coverNumber: 2, title: "Château", eyebrow: "Le lieu devient récit", universe: "Lieux", category: "Réception", type: "Lieu", style: "Patrimoine", budget: "Exception", image: images[4],
+    id: "chateau", coverNumber: 2, title: "Château", eyebrow: "Le lieu devient récit", universe: "Lieux", category: "Réception", type: "Lieu", style: "Patrimoine", budget: "Exception", image: "/covers/002-chateau.jpg",
     intro: "Des murs, des perspectives et une journée entière pour imaginer votre propre usage du lieu.",
     description: "Un château est bien davantage qu’un décor. Son parc, ses salons, ses accès et sa lumière influencent le rythme du mariage. C’est le point de départ d’une composition : cérémonie, dîner, nuit, lendemain.",
     moments: ["Préparatifs", "Cérémonie", "Cocktail", "Dîner", "Soirée", "Lendemain"], services: ["Privatisation", "Hébergement", "Mise à disposition du parc", "Coordination sur place"], brings: ["Une architecture forte", "Des séquences multiples", "Un cadre pour recevoir"], toPlan: ["Le plan B météo", "Le stationnement", "Les horaires", "Les hébergements"], constraints: ["Restrictions sonores", "Accès prestataires", "Assurance", "Capacité d’accueil"], resources: ["Parking", "Électricité", "Mobilier", "Espace traiteur"], related: ["traiteur", "fleuriste", "mobilier", "dj", "photographe", "hebergement", "eclairage"], professionals: [pro("Château de Vaumarcé", "Domaine de réception", "Val de Loire"), pro("Les Terres Hautes", "Domaine & hôtellerie", "Provence")]
   },
   {
-    id: "traiteur", coverNumber: 3, title: "Traiteur", eyebrow: "Le goût, en mouvement", universe: "Restauration", category: "Cuisine", type: "Métier", style: "Contemporain", budget: "Signature", image: images[3],
+    id: "traiteur", coverNumber: 3, title: "Traiteur", eyebrow: "Le goût, en mouvement", universe: "Restauration", category: "Cuisine", type: "Métier", style: "Contemporain", budget: "Signature", image: "/covers/003-traiteur.jpg",
     intro: "Un repas qui tient autant à son tempo qu’à ses assiettes.",
     description: "Du verre d’accueil au brunch du lendemain, le traiteur compose une hospitalité. Les formats — dîner servi, grandes tablées, stations culinaires — racontent chacun une façon différente de réunir les invités.",
     moments: ["Cocktail", "Dîner", "Brunch"], services: ["Cocktail dînatoire", "Dîner servi", "Ateliers culinaires", "Brunch", "Équipe de salle"], brings: ["Un fil gourmand", "Le soin de l’accueil", "Le rythme du repas"], toPlan: ["Le nombre d’invités", "Les régimes alimentaires", "Le timing", "La dégustation"], constraints: ["Office de cuisine", "Chambre froide", "Accès livraison", "Eau"], resources: ["Cuisine", "Tables", "Verrerie", "Électricité"], related: ["chateau", "wedding-cake", "bar", "mobilier", "papeterie"], professionals: [pro("Studio Culinaire", "Traiteur créatif", "Paris"), pro("Nourrir l’Instant", "Cuisine de réception", "Bordeaux")]
   },
   {
-    id: "dj", coverNumber: 4, title: "DJ", eyebrow: "La nuit commence ici", universe: "Musique", category: "Soirée", type: "Métier", style: "Électrique", budget: "Signature", image: images[7],
+    id: "dj", coverNumber: 4, title: "DJ", eyebrow: "La nuit commence ici", universe: "Musique", category: "Soirée", type: "Métier", style: "Électrique", budget: "Signature", image: "/covers/004-dj.jpg",
     intro: "Une direction musicale précise, pour faire basculer la réception en fête.",
     description: "Un bon DJ lit une salle sans l’écraser. Il relie les générations, accompagne les changements de lumière et imagine une énergie qui appartient au couple plutôt qu’à une playlist préfabriquée.",
     moments: ["Cocktail", "Dîner", "Première danse", "Soirée"], services: ["DJ set", "Direction musicale", "Sonorisation", "Lumière de soirée", "Micro cérémonie"], brings: ["Un fil musical", "Une piste vivante", "Des transitions fluides"], toPlan: ["Les goûts musicaux", "Le déroulé", "Le matériel", "Les titres importants"], constraints: ["Coupure sonore", "Puissance électrique", "Montage", "Acoustique"], resources: ["Régie DJ", "Électricité", "Espace danse", "Éclairage"], related: ["saxophoniste", "chateau", "eclairage", "ceremonie-laique", "photographe"], professionals: [pro("Mina Moods", "DJ & direction musicale", "Paris"), pro("Atelier Tempo", "Collectif DJ", "Marseille")]
@@ -69,7 +87,7 @@ export const subjects: Subject[] = [
     moments: ["Préparatifs", "Cérémonie", "Couple", "Cocktail", "Dîner", "Soirée"], services: ["Reportage journée", "Séance couple", "Argentique", "Album", "Second photographe"], brings: ["Une mémoire sensible", "Les détails invisibles", "Un récit à transmettre"], toPlan: ["Le temps de couple", "La liste famille", "La lumière", "Les autorisations"], constraints: ["Droit à l’image", "Accès aux lieux", "Lumière basse", "Timing"], resources: ["Espace préparation", "Temps dédié", "Plan de journée"], related: ["videaste", "chateau", "ceremonie-laique"], professionals: [pro("Camille Novae", "Photographe documentaire", "Paris"), pro("Noor Studio", "Photo & argentique", "Nice")]
   },
   {
-    id: "ceremonie-laique", coverNumber: 6, title: "Cérémonie laïque", eyebrow: "Inventer son oui", universe: "Cérémonie", category: "Engagement", type: "Expérience", style: "Intime", budget: "Essentiel", image: images[5],
+    id: "ceremonie-laique", coverNumber: 6, title: "Cérémonie laïque", eyebrow: "Inventer son oui", universe: "Cérémonie", category: "Engagement", type: "Expérience", style: "Intime", budget: "Essentiel", image: "/covers/006-ceremonie-laique.jpg",
     intro: "Une séquence écrite à votre mesure, dans le lieu et avec les mots qui vous ressemblent.",
     description: "Une cérémonie laïque laisse la place à une voix, à des proches, à une musique et à un rituel. Sa force est dans son rythme : suffisamment préparée pour être simple, suffisamment libre pour être juste.",
     moments: ["Cérémonie"], services: ["Écriture", "Officiant", "Rituel symbolique", "Musique live", "Coordination"], brings: ["Un moment personnel", "La voix des proches", "Un commencement fort"], toPlan: ["Les prises de parole", "La durée", "Le plan de pluie", "Le son"], constraints: ["Chaises", "Microphones", "Météo", "Accessibilité"], resources: ["Arche", "Assises", "Sonorisation", "Ombre"], related: ["officiant", "saxophoniste", "fleuriste", "chateau", "papeterie"], professionals: [pro("Ariane Verne", "Officiante", "France"), pro("Words & Vows", "Cérémonies écrites", "Bruxelles")]
@@ -81,19 +99,19 @@ export const subjects: Subject[] = [
     moments: ["Préparatifs", "Cérémonie", "Cocktail", "Dîner"], services: ["Bouquet", "Arche", "Centres de table", "Boutonnières", "Installation"], brings: ["Une palette vivante", "Du rythme dans l’espace", "Des gestes à photographier"], toPlan: ["La saison", "Les volumes", "La réutilisation", "La livraison"], constraints: ["Chaleur", "Eau", "Temps de pose", "Démontage"], resources: ["Vases", "Points d’eau", "Stockage frais"], related: ["chateau", "ceremonie-laique", "decorateur", "photographe", "wedding-cake"], professionals: [pro("Herbier Moderne", "Design floral", "Paris"), pro("Maison Pollen", "Fleurs de saison", "Lille")]
   },
   {
-    id: "wedding-cake", coverNumber: 8, title: "Wedding cake", eyebrow: "Le dernier geste sucré", universe: "Gâteau", category: "Pâtisserie", type: "Service", style: "Sculptural", budget: "Signature", image: images[2],
+    id: "wedding-cake", coverNumber: 8, title: "Wedding cake", eyebrow: "Le dernier geste sucré", universe: "Gâteau", category: "Pâtisserie", type: "Service", style: "Sculptural", budget: "Signature", image: "/covers/008-wedding-cake.jpg",
     intro: "Une pièce à regarder, partager, photographier — avant même d’être dégustée.",
     description: "Le wedding cake joue un rôle de ponctuation. Il peut rejoindre le dîner, ouvrir la soirée ou devenir le centre d’une table de desserts pensée comme un décor.",
     moments: ["Dîner", "Soirée", "Brunch"], services: ["Gâteau sur mesure", "Table de desserts", "Décor comestible", "Livraison"], brings: ["Un final visuel", "Un rituel de partage", "Une signature gourmande"], toPlan: ["Le nombre de parts", "Le style", "Le moment de découpe", "La conservation"], constraints: ["Réfrigération", "Table stable", "Accès livraison", "Température"], resources: ["Table gâteau", "Chambre froide", "Couteau de découpe"], related: ["traiteur", "fleuriste", "photographe", "papeterie", "bar"], professionals: [pro("Clara Gâteaux", "Pâtisserie sur mesure", "Paris"), pro("Atelier Crème", "Pâtisserie événementielle", "Lyon")]
   },
   {
-    id: "videaste", coverNumber: 9, title: "Vidéaste", eyebrow: "L’émotion en mouvement", universe: "Image", category: "Film", type: "Métier", style: "Cinématique", budget: "Signature", image: images[0],
+    id: "videaste", coverNumber: 9, title: "Vidéaste", eyebrow: "L’émotion en mouvement", universe: "Image", category: "Film", type: "Métier", style: "Cinématique", budget: "Signature", image: "/covers/009-videaste.jpg",
     intro: "Le son des vœux, un voile qui traverse le cadre, le mouvement d’une fête : tout ce que l’image fixe ne dit pas.",
     description: "Le film de mariage n’est pas un résumé. C’est une interprétation vivante de la journée, nourrie de voix, de sons et de séquences qui seront différentes à chaque revisionnage.",
     moments: ["Préparatifs", "Cérémonie", "Cocktail", "Soirée"], services: ["Film long", "Teaser", "Super 8", "Prises de son", "Drone"], brings: ["Des voix conservées", "Une mémoire en mouvement", "Un autre regard"], toPlan: ["La présence photo", "Le déroulé", "Les autorisations", "Le son des vœux"], constraints: ["Droit à l’image", "Drone autorisé", "Lumière", "Espace de travail"], resources: ["Prises électriques", "Accès", "Plan de journée"], related: ["photographe", "ceremonie-laique", "dj", "drone"], professionals: [pro("Hors Champ Films", "Film documentaire", "Bordeaux"), pro("Studio Slow", "Super 8 & vidéo", "Paris")]
   },
   {
-    id: "decorateur", coverNumber: 10, title: "Scénographie", eyebrow: "Donner une ligne au lieu", universe: "Décoration", category: "Design", type: "Métier", style: "Éditorial", budget: "Exception", image: images[2],
+    id: "decorateur", coverNumber: 10, title: "Scénographie", eyebrow: "Donner une ligne au lieu", universe: "Décoration", category: "Design", type: "Métier", style: "Éditorial", budget: "Exception", image: "/covers/010-scenographie.jpg",
     intro: "Mobilier, matières, signes : l’art de rendre un lieu profondément vôtre.",
     description: "La scénographie dessine un parcours, du premier accueil à la dernière table. Elle ne masque pas un lieu : elle trouve sa ligne de dialogue avec lui.",
     moments: ["Cérémonie", "Cocktail", "Dîner", "Soirée"], services: ["Direction artistique", "Plans de tables", "Installation", "Location mobilier", "Signalétique"], brings: ["Une vision cohérente", "Des espaces lisibles", "Un décor habité"], toPlan: ["Les flux", "La palette", "Les dimensions", "Le démontage"], constraints: ["Accès camion", "Temps de montage", "Sécurité", "Stockage"], resources: ["Mobilier", "Éclairage", "Équipe de pose"], related: ["fleuriste", "mobilier", "eclairage", "chateau", "papeterie"], professionals: [pro("Bureau Forme", "Scénographie", "Paris"), pro("Les Assemblages", "Design d’événements", "Nantes")]
@@ -141,13 +159,13 @@ export const subjects: Subject[] = [
     moments: ["Cérémonie", "Cocktail", "Dîner", "Soirée"], services: ["Location tables", "Assises", "Art de la table", "Salons", "Livraison"], brings: ["Du confort", "Un rythme spatial", "Une vraie signature"], toPlan: ["Le nombre d’invités", "Les plans", "Les livraisons", "Le démontage"], constraints: ["Accès camion", "Sol", "Stockage", "Montage"], resources: ["Plan d’implantation", "Équipe de pose", "Accès"], related: ["decorateur", "chateau", "traiteur", "eclairage", "ceremonie-laique"], professionals: [pro("Formes Libres", "Location design", "Paris"), pro("Tableau Studio", "Mobilier de réception", "Lyon")]
   },
   {
-    id: "eclairage", coverNumber: 18, title: "Éclairage", eyebrow: "La nuit, bien vue", universe: "Décoration", category: "Lumière", type: "Service", style: "Nocturne", budget: "Signature", image: images[4],
+    id: "eclairage", coverNumber: 18, title: "Éclairage", eyebrow: "La nuit, bien vue", universe: "Décoration", category: "Lumière", type: "Service", style: "Nocturne", budget: "Signature", image: "/covers/018-eclairage.jpg",
     intro: "Quand la lumière baisse, le lieu peut commencer une autre histoire.",
     description: "L’éclairage fait passer une réception de l’après-midi à la nuit. Guirlandes, bougies, projecteurs doux ou lumière de piste : chaque source crée un usage et une émotion.",
     moments: ["Cérémonie", "Cocktail", "Dîner", "Soirée"], services: ["Lumière architecturale", "Piste de danse", "Guirlandes", "Bougies", "Régie"], brings: ["De la profondeur", "De la sécurité", "Une atmosphère nocturne"], toPlan: ["Les zones à éclairer", "Le coucher du soleil", "Les couleurs", "Le montage"], constraints: ["Électricité", "Sécurité", "Extérieur", "Coupure sonore"], resources: ["Puissance électrique", "Accès technique", "Échelle"], related: ["dj", "decorateur", "chateau", "photographe", "mobilier"], professionals: [pro("Lumen Club", "Design lumière", "Paris"), pro("Nuit Blanche", "Éclairage événementiel", "Aix")]
   },
   {
-    id: "officiant", coverNumber: 19, title: "Officiant", eyebrow: "Faire entendre l’essentiel", universe: "Cérémonie", category: "Engagement", type: "Métier", style: "Littéraire", budget: "Essentiel", image: images[5],
+    id: "officiant", coverNumber: 19, title: "Officiant", eyebrow: "Faire entendre l’essentiel", universe: "Cérémonie", category: "Engagement", type: "Métier", style: "Littéraire", budget: "Essentiel", image: "/covers/019-officiant.jpg",
     intro: "Une voix qui relie vos histoires, vos proches et l’instant où vous vous engagez.",
     description: "L’officiant écoute avant d’écrire. Il trouve la juste place entre les mots préparés et ce qui arrive réellement, pour que la cérémonie reste intime même au milieu de tous.",
     moments: ["Cérémonie"], services: ["Entretiens", "Écriture", "Animation", "Rituels", "Coordination des proches"], brings: ["Un récit singulier", "Un cadre apaisant", "Des paroles justes"], toPlan: ["Les rendez-vous", "Les intervenants", "Le texte", "Le son"], constraints: ["Microphones", "Météo", "Durée", "Accessibilité"], resources: ["Sonorisation", "Chaises", "Pupitre"], related: ["ceremonie-laique", "saxophoniste", "fleuriste", "papeterie", "chateau"], professionals: [pro("Ariane Verne", "Officiante", "France"), pro("Les Mots Dits", "Officiant & écriture", "Paris")]
