@@ -8,9 +8,11 @@ import {
   publishedCoverCount,
   subjects,
   universes,
+  weddingMomentOrder,
   type Subject,
   type WeddingStatus,
 } from "@/lib/wedding-data";
+import { sortWeddingSelectionsByMoment } from "@/lib/wedding-project";
 
 type SelectionMap = Record<string, WeddingStatus>;
 
@@ -132,9 +134,16 @@ export default function HomePage() {
     setToast(`${label} a été retiré.`);
   };
 
-  const selectedSubjects = useMemo(
-    () => Object.keys(project).map(getSubject).filter((subject): subject is Subject => Boolean(subject)),
+  const organizedSelections = useMemo(
+    () => sortWeddingSelectionsByMoment(
+      Object.entries(project).map(([subjectId, status]) => ({ subjectId, status })),
+    ),
     [project],
+  );
+
+  const selectedSubjects = useMemo(
+    () => organizedSelections.flatMap((group) => group.selections.map((selection) => selection.subject)),
+    [organizedSelections],
   );
 
   const filteredSubjects = useMemo(() => {
@@ -256,7 +265,7 @@ export default function HomePage() {
                     <CoverMark number={subject.coverNumber} light />
                     <div className="cover-content">
                       <p>{subject.universe.toUpperCase()} · {subject.type.toUpperCase()}</p>
-                      <h3>{subject.title}</h3>
+                      <h3 className={subject.title.length > 16 ? "cover-title-long" : undefined}>{subject.title}</h3>
                       <span>{subject.eyebrow}</span>
                     </div>
                   </button>
@@ -352,15 +361,26 @@ export default function HomePage() {
                 <section className="project-section selected-section">
                   <p className="block-title">CE QUE VOUS AVEZ CHOISI</p>
                   <div className="project-selections">
-                    {selectedSubjects.map((subject) => (
-                      <article className="project-item" key={subject.id}>
-                        <button className="project-thumb" style={{ backgroundImage: `url(${subject.image})` }} onClick={() => { setActiveSubject(subject); setDrawerOpen(false); }} aria-label={`Voir ${subject.title}`} />
-                        <div className="project-item-main"><button onClick={() => { setActiveSubject(subject); setDrawerOpen(false); }}>{subject.title}</button><span>{subject.universe}</span></div>
-                        <select value={project[subject.id]} onChange={(event) => updateStatus(subject.id, event.target.value as WeddingStatus)} className={statusClass(project[subject.id])} aria-label={`État de ${subject.title}`}>
-                          <option value="interested">M’intéresse</option><option value="contacted">Contacté</option><option value="chosen">Choisi</option>
-                        </select>
-                        <button className="remove-item" onClick={() => removeSubject(subject.id)} aria-label={`Retirer ${subject.title}`}>×</button>
-                      </article>
+                    {organizedSelections.map((group, groupIndex) => (
+                      <section className="moment-group" key={group.moment ?? "other"} aria-labelledby={`moment-${groupIndex}`}>
+                        <div className="moment-heading">
+                          <b>{group.moment ? String(weddingMomentOrder.indexOf(group.moment) + 1).padStart(2, "0") : "—"}</b>
+                          <h3 id={`moment-${groupIndex}`}>{group.moment ?? "À organiser"}</h3>
+                        </div>
+                        {group.selections.map(({ subject, status, moments }) => (
+                          <article className="project-item" key={subject.id}>
+                            <button className="project-thumb" style={{ backgroundImage: `url(${subject.image})` }} onClick={() => { setActiveSubject(subject); setDrawerOpen(false); }} aria-label={`Voir ${subject.title}`} />
+                            <div className="project-item-main">
+                              <button onClick={() => { setActiveSubject(subject); setDrawerOpen(false); }}>{subject.title}</button>
+                              <span>{moments.length > 1 ? `Aussi : ${moments.slice(1).join(" · ")}` : subject.universe}</span>
+                            </div>
+                            <select value={status} onChange={(event) => updateStatus(subject.id, event.target.value as WeddingStatus)} className={statusClass(status)} aria-label={`État de ${subject.title}`}>
+                              <option value="interested">M’intéresse</option><option value="contacted">Contacté</option><option value="chosen">Choisi</option>
+                            </select>
+                            <button className="remove-item" onClick={() => removeSubject(subject.id)} aria-label={`Retirer ${subject.title}`}>×</button>
+                          </article>
+                        ))}
+                      </section>
                     ))}
                   </div>
                 </section>
