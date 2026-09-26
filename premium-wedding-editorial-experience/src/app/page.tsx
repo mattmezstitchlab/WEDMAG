@@ -2,10 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  coverCount,
   getSubject,
   images,
-  statusLabel,
+  plannedCoverCount,
+  publishedCoverCount,
   subjects,
   universes,
   type Subject,
@@ -41,24 +41,46 @@ export default function HomePage() {
   const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
-    try {
-      const stored = window.localStorage.getItem(storageKey);
-      if (stored) setProject(JSON.parse(stored) as SelectionMap);
-    } catch {
-      // The project remains fully usable if browser storage is unavailable.
-    }
-    setIsHydrated(true);
+    let cancelled = false;
 
-    void fetch("/api/wedding/selections")
-      .then(async (response) => (response.ok ? response.json() : null))
-      .then((payload: { selections?: { subjectId: string; status: WeddingStatus }[] } | null) => {
-        if (!payload?.selections?.length) return;
-        setProject((current) => {
-          const fromServer = Object.fromEntries(payload.selections!.map((item) => [item.subjectId, item.status]));
-          return { ...fromServer, ...current };
-        });
-      })
-      .catch(() => undefined);
+    // Local storage and the API are both external systems: read them in one
+    // async pass and commit a single state update, instead of calling
+    // setState synchronously in the effect body (cascading renders).
+    const restoreProject = async () => {
+      let local: SelectionMap = {};
+      try {
+        const stored = window.localStorage.getItem(storageKey);
+        if (stored) local = JSON.parse(stored) as SelectionMap;
+      } catch {
+        // The project remains fully usable if browser storage is unavailable.
+      }
+
+      let fromServer: SelectionMap = {};
+      try {
+        const response = await fetch("/api/wedding/selections");
+        if (response.ok) {
+          const payload = (await response.json()) as {
+            selections?: { subjectId: string; status: WeddingStatus }[];
+          };
+          if (payload.selections?.length) {
+            fromServer = Object.fromEntries(payload.selections.map((item) => [item.subjectId, item.status]));
+          }
+        }
+      } catch {
+        // Server persistence is progressive enhancement.
+      }
+
+      if (cancelled) return;
+      // `current` wins: anything ticked while loading must not be discarded.
+      setProject((current) => ({ ...fromServer, ...local, ...current }));
+      setIsHydrated(true);
+    };
+
+    void restoreProject();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -202,7 +224,7 @@ export default function HomePage() {
             <p className="section-kicker">L’INDEX À FEUILLETER</p>
             <h2 id="magazine-title">Les couvertures<br /><i>du moment.</i></h2>
           </div>
-          <div className="issue-counter"><b>001—036</b><span>/ {coverCount} COUVERTURES</span><em>ÉDITION EN COURS</em></div>
+          <div className="issue-counter"><b>001—{String(publishedCoverCount).padStart(3, "0")}</b><span>/ {publishedCoverCount} PUBLIÉES</span><em>ÉDITION EN COURS</em></div>
         </div>
 
         <div className="filter-bar">
@@ -250,7 +272,7 @@ export default function HomePage() {
         )}
 
         <div className="next-edition">
-          <span>037—365</span>
+          <span>{String(publishedCoverCount + 1).padStart(3, "0")}—{plannedCoverCount}</span>
           <p>Le magazine s’étoffe avec vos histoires. Les autres couvertures attendent déjà leur moment.</p>
           <button onClick={() => { setQuery(""); setUniverse("Tous"); scrollToMagazine(); }}>REVENIR À L’INDEX <span>↑</span></button>
         </div>

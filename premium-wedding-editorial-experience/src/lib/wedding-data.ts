@@ -42,7 +42,7 @@ export const subjects: Subject[] = [
     id: "saxophoniste", coverNumber: 1, title: "Saxophoniste", eyebrow: "Le détail qui change l’air", universe: "Musique", category: "Live", type: "Métier", style: "Solaire", budget: "Signature", image: images[0],
     intro: "Une présence live, libre et immédiate — du premier verre à la dernière danse.",
     description: "Le saxophoniste ne définit pas une ambiance à lui seul. Il la fait respirer. En solo à la cérémonie, au milieu des invités pendant le cocktail ou aux côtés d’un DJ, il introduit une chaleur organique dans les temps forts de la journée.",
-    moments: ["Cérémonie", "Cocktail", "Dîner", "Première danse", "Soirée"], services: ["Prestation live", "Set cocktail", "Cérémonie sur mesure", "Accompagnement DJ", "Intervention surprise"], brings: ["Une émotion immédiate", "Un rythme vivant", "Une transition mémorable"], toPlan: ["L’espace de jeu", "Les accès", "Les horaires d’intervention", "Le répertoire"], constraints: ["Sonorisation éventuelle", "Alimentation électrique", "Niveau sonore autorisé"], resources: ["Espace scène", "Prise électrique", "Système audio"], related: ["dj", "chateau", "ceremonie-laique", "cocktail", "eclairage"], professionals: [pro("Léo Hartmann", "Saxophoniste live", "Paris"), pro("Golden Notes", "Collectif musical", "Lyon")]
+    moments: ["Cérémonie", "Cocktail", "Dîner", "Première danse", "Soirée"], services: ["Prestation live", "Set cocktail", "Cérémonie sur mesure", "Accompagnement DJ", "Intervention surprise"], brings: ["Une émotion immédiate", "Un rythme vivant", "Une transition mémorable"], toPlan: ["L’espace de jeu", "Les accès", "Les horaires d’intervention", "Le répertoire"], constraints: ["Sonorisation éventuelle", "Alimentation électrique", "Niveau sonore autorisé"], resources: ["Espace scène", "Prise électrique", "Système audio"], related: ["dj", "chateau", "ceremonie-laique", "eclairage"], professionals: [pro("Léo Hartmann", "Saxophoniste live", "Paris"), pro("Golden Notes", "Collectif musical", "Lyon")]
   },
   {
     id: "chateau", coverNumber: 2, title: "Château", eyebrow: "Le lieu devient récit", universe: "Lieux", category: "Réception", type: "Lieu", style: "Patrimoine", budget: "Exception", image: images[4],
@@ -66,7 +66,7 @@ export const subjects: Subject[] = [
     id: "photographe", coverNumber: 5, title: "Photographe", eyebrow: "Ce qui restera", universe: "Image", category: "Photographie", type: "Métier", style: "Documentaire", budget: "Signature", image: images[1],
     intro: "Regarder la journée de près, sans jamais la faire sortir de son cours.",
     description: "Le photographe construit une mémoire avant de livrer des images. Des préparatifs au dernier verre, sa présence est une manière de préserver les gestes, les regards et l’énergie d’une journée impossible à rejouer.",
-    moments: ["Préparatifs", "Cérémonie", "Couple", "Cocktail", "Dîner", "Soirée"], services: ["Reportage journée", "Séance couple", "Argentique", "Album", "Second photographe"], brings: ["Une mémoire sensible", "Les détails invisibles", "Un récit à transmettre"], toPlan: ["Le temps de couple", "La liste famille", "La lumière", "Les autorisations"], constraints: ["Droit à l’image", "Accès aux lieux", "Lumière basse", "Timing"], resources: ["Espace préparation", "Temps dédié", "Plan de journée"], related: ["videaste", "chateau", "ceremonie-laique", "cocktail", "album"], professionals: [pro("Camille Novae", "Photographe documentaire", "Paris"), pro("Noor Studio", "Photo & argentique", "Nice")]
+    moments: ["Préparatifs", "Cérémonie", "Couple", "Cocktail", "Dîner", "Soirée"], services: ["Reportage journée", "Séance couple", "Argentique", "Album", "Second photographe"], brings: ["Une mémoire sensible", "Les détails invisibles", "Un récit à transmettre"], toPlan: ["Le temps de couple", "La liste famille", "La lumière", "Les autorisations"], constraints: ["Droit à l’image", "Accès aux lieux", "Lumière basse", "Timing"], resources: ["Espace préparation", "Temps dédié", "Plan de journée"], related: ["videaste", "chateau", "ceremonie-laique"], professionals: [pro("Camille Novae", "Photographe documentaire", "Paris"), pro("Noor Studio", "Photo & argentique", "Nice")]
   },
   {
     id: "ceremonie-laique", coverNumber: 6, title: "Cérémonie laïque", eyebrow: "Inventer son oui", universe: "Cérémonie", category: "Engagement", type: "Expérience", style: "Intime", budget: "Essentiel", image: images[5],
@@ -90,7 +90,7 @@ export const subjects: Subject[] = [
     id: "videaste", coverNumber: 9, title: "Vidéaste", eyebrow: "L’émotion en mouvement", universe: "Image", category: "Film", type: "Métier", style: "Cinématique", budget: "Signature", image: images[0],
     intro: "Le son des vœux, un voile qui traverse le cadre, le mouvement d’une fête : tout ce que l’image fixe ne dit pas.",
     description: "Le film de mariage n’est pas un résumé. C’est une interprétation vivante de la journée, nourrie de voix, de sons et de séquences qui seront différentes à chaque revisionnage.",
-    moments: ["Préparatifs", "Cérémonie", "Cocktail", "Soirée"], services: ["Film long", "Teaser", "Super 8", "Prises de son", "Drone"], brings: ["Des voix conservées", "Une mémoire en mouvement", "Un autre regard"], toPlan: ["La présence photo", "Le déroulé", "Les autorisations", "Le son des vœux"], constraints: ["Droit à l’image", "Drone autorisé", "Lumière", "Espace de travail"], resources: ["Prises électriques", "Accès", "Plan de journée"], related: ["photographe", "ceremonie-laique", "dj", "drone", "album"], professionals: [pro("Hors Champ Films", "Film documentaire", "Bordeaux"), pro("Studio Slow", "Super 8 & vidéo", "Paris")]
+    moments: ["Préparatifs", "Cérémonie", "Cocktail", "Soirée"], services: ["Film long", "Teaser", "Super 8", "Prises de son", "Drone"], brings: ["Des voix conservées", "Une mémoire en mouvement", "Un autre regard"], toPlan: ["La présence photo", "Le déroulé", "Les autorisations", "Le son des vœux"], constraints: ["Droit à l’image", "Drone autorisé", "Lumière", "Espace de travail"], resources: ["Prises électriques", "Accès", "Plan de journée"], related: ["photographe", "ceremonie-laique", "dj", "drone"], professionals: [pro("Hors Champ Films", "Film documentaire", "Bordeaux"), pro("Studio Slow", "Super 8 & vidéo", "Paris")]
   },
   {
     id: "decorateur", coverNumber: 10, title: "Scénographie", eyebrow: "Donner une ligne au lieu", universe: "Décoration", category: "Design", type: "Métier", style: "Éditorial", budget: "Exception", image: images[2],
@@ -102,7 +102,7 @@ export const subjects: Subject[] = [
     id: "robe", coverNumber: 11, title: "La robe", eyebrow: "Une allure, à votre façon", universe: "Mode", category: "Mariée", type: "Objet", style: "Couture", budget: "Exception", image: images[2],
     intro: "Le vêtement n’achève pas une silhouette : il ouvre une manière d’habiter sa journée.",
     description: "Choisir une robe, c’est imaginer le mouvement, la lumière, la météo, la danse. Entre création sur mesure et sélection de maison, l’essentiel est dans ce que l’on ressent quand on l’oublie enfin.",
-    moments: ["Préparatifs", "Cérémonie", "Dîner", "Soirée"], services: ["Sur mesure", "Retouches", "Voile", "Deuxième tenue", "Essayages"], brings: ["Une allure personnelle", "Une mémoire tactile", "La liberté de bouger"], toPlan: ["Les essayages", "Les chaussures", "La météo", "La tenue de soirée"], constraints: ["Délais atelier", "Transport", "Retouches", "Confort"], resources: ["Housse", "Miroir", "Espace préparation"], related: ["coiffure", "maquillage", "bijoux", "photographe", "chaussures"], professionals: [pro("Atelier June", "Créatrice", "Paris"), pro("Nara Studio", "Maison de robe", "Bruxelles")]
+    moments: ["Préparatifs", "Cérémonie", "Dîner", "Soirée"], services: ["Sur mesure", "Retouches", "Voile", "Deuxième tenue", "Essayages"], brings: ["Une allure personnelle", "Une mémoire tactile", "La liberté de bouger"], toPlan: ["Les essayages", "Les chaussures", "La météo", "La tenue de soirée"], constraints: ["Délais atelier", "Transport", "Retouches", "Confort"], resources: ["Housse", "Miroir", "Espace préparation"], related: ["coiffure", "maquillage", "bijoux", "photographe"], professionals: [pro("Atelier June", "Créatrice", "Paris"), pro("Nara Studio", "Maison de robe", "Bruxelles")]
   },
   {
     id: "costume", coverNumber: 12, title: "Le costume", eyebrow: "La coupe du jour", universe: "Mode", category: "Marié", type: "Objet", style: "Tailoring", budget: "Signature", image: images[6],
@@ -132,7 +132,7 @@ export const subjects: Subject[] = [
     id: "bar", coverNumber: 16, title: "Bar à cocktails", eyebrow: "L’accueil a son verre", universe: "Boissons", category: "Bar", type: "Service", style: "Festif", budget: "Signature", image: images[3],
     intro: "Un cocktail bien pensé est une façon de donner le premier tempo de la fête.",
     description: "Bar mobile, cocktails signatures, champagne ou sélection de vins : les boissons accompagnent les passages de la journée. Elles peuvent être discrètes ou devenir un rendez-vous à part entière.",
-    moments: ["Cocktail", "Dîner", "Soirée", "Brunch"], services: ["Cocktails signatures", "Bar mobile", "Service champagne", "Sans alcool", "Mixologie"], brings: ["Un geste d’accueil", "Une expérience partagée", "Un détail vivant"], toPlan: ["Les quantités", "Les options sans alcool", "Le timing", "Le verre"], constraints: ["Licence", "Eau", "Glace", "Stockage"], resources: ["Comptoir", "Réfrigération", "Verrerie"], related: ["traiteur", "chateau", "cocktail", "dj", "mobilier"], professionals: [pro("Miroir Bar", "Cocktails & service", "Paris"), pro("Le Comptoir Nomade", "Bar mobile", "Lyon")]
+    moments: ["Cocktail", "Dîner", "Soirée", "Brunch"], services: ["Cocktails signatures", "Bar mobile", "Service champagne", "Sans alcool", "Mixologie"], brings: ["Un geste d’accueil", "Une expérience partagée", "Un détail vivant"], toPlan: ["Les quantités", "Les options sans alcool", "Le timing", "Le verre"], constraints: ["Licence", "Eau", "Glace", "Stockage"], resources: ["Comptoir", "Réfrigération", "Verrerie"], related: ["traiteur", "chateau", "dj", "mobilier"], professionals: [pro("Miroir Bar", "Cocktails & service", "Paris"), pro("Le Comptoir Nomade", "Bar mobile", "Lyon")]
   },
   {
     id: "mobilier", coverNumber: 17, title: "Mobilier", eyebrow: "Recevoir avec intention", universe: "Décoration", category: "Location", type: "Objet", style: "Design", budget: "Signature", image: images[7],
@@ -174,7 +174,7 @@ export const subjects: Subject[] = [
     id: "photobooth", coverNumber: 23, title: "Photobooth", eyebrow: "Des images qui circulent", universe: "Animations", category: "Photo", type: "Expérience", style: "Spontané", budget: "Essentiel", image: images[3],
     intro: "L’appareil devient un prétexte pour réunir les générations, une pose après l’autre.",
     description: "Un photobooth peut être graphique, argentique, discret ou joyeusement excessif. Il laisse aux invités leur propre angle sur la fête et offre des souvenirs qui sortent immédiatement des téléphones.",
-    moments: ["Cocktail", "Dîner", "Soirée"], services: ["Tirages instantanés", "Studio portrait", "Livre d’or photo", "Galerie digitale"], brings: ["De l’interaction", "Des souvenirs immédiats", "Des images inattendues"], toPlan: ["L’emplacement", "Le fond", "Les tirages", "La livraison"], constraints: ["Électricité", "Espace", "Réseau", "Accès"], resources: ["Prise", "Table", "Fond photo"], related: ["photographe", "decorateur", "livre-or", "dj", "cocktail"], professionals: [pro("Flash Club", "Photobooth", "Paris"), pro("Pose Studio", "Portrait instantané", "Lyon")]
+    moments: ["Cocktail", "Dîner", "Soirée"], services: ["Tirages instantanés", "Studio portrait", "Livre d’or photo", "Galerie digitale"], brings: ["De l’interaction", "Des souvenirs immédiats", "Des images inattendues"], toPlan: ["L’emplacement", "Le fond", "Les tirages", "La livraison"], constraints: ["Électricité", "Espace", "Réseau", "Accès"], resources: ["Prise", "Table", "Fond photo"], related: ["photographe", "decorateur", "livre-or", "dj"], professionals: [pro("Flash Club", "Photobooth", "Paris"), pro("Pose Studio", "Portrait instantané", "Lyon")]
   },
   {
     id: "groupe-live", coverNumber: 24, title: "Groupe live", eyebrow: "Un refrain collectif", universe: "Musique", category: "Live", type: "Métier", style: "Généreux", budget: "Exception", image: images[3],
@@ -198,7 +198,7 @@ export const subjects: Subject[] = [
     id: "livre-or", coverNumber: 27, title: "Livre d’or", eyebrow: "Vos proches, en mots", universe: "Souvenirs", category: "Mémoire", type: "Objet", style: "Tactile", budget: "Essentiel", image: images[7],
     intro: "Un objet discret, ouvert toute la soirée, qui vous rendra leurs voix bien après.",
     description: "Papier, polaroids, messages audio ou vidéo : le livre d’or ne demande qu’un geste aux invités. Son intérêt est justement dans ces mots qui n’auraient peut-être jamais été dits autrement.",
-    moments: ["Cocktail", "Dîner", "Soirée"], services: ["Livre papier", "Messages audio", "Livre photo", "Personnalisation"], brings: ["Des voix conservées", "Un rituel doux", "Un souvenir collectif"], toPlan: ["L’emplacement", "Les consignes", "Le matériel", "La récupération"], constraints: ["Espace calme", "Stylo", "Batterie", "Signalétique"], resources: ["Table", "Éclairage", "Papeterie"], related: ["photobooth", "papeterie", "decorateur", "photographe", "souvenirs"], professionals: [pro("Mémoires Parlées", "Livre d’or audio", "Paris"), pro("Papier Souvenir", "Objets imprimés", "Lyon")]
+    moments: ["Cocktail", "Dîner", "Soirée"], services: ["Livre papier", "Messages audio", "Livre photo", "Personnalisation"], brings: ["Des voix conservées", "Un rituel doux", "Un souvenir collectif"], toPlan: ["L’emplacement", "Les consignes", "Le matériel", "La récupération"], constraints: ["Espace calme", "Stylo", "Batterie", "Signalétique"], resources: ["Table", "Éclairage", "Papeterie"], related: ["photobooth", "papeterie", "decorateur", "photographe"], professionals: [pro("Mémoires Parlées", "Livre d’or audio", "Paris"), pro("Papier Souvenir", "Objets imprimés", "Lyon")]
   },
   {
     id: "invites", coverNumber: 28, title: "Invités & attention", eyebrow: "Recevoir chacun", universe: "Invités", category: "Hospitalité", type: "Service", style: "Attentionné", budget: "Essentiel", image: images[0],
@@ -257,7 +257,11 @@ export const subjects: Subject[] = [
 ];
 
 export const universes = ["Tous", ...Array.from(new Set(subjects.map((subject) => subject.universe)))];
-export const coverCount = 365;
+
+/** Covers actually written and shippable today. Derived, never hardcoded. */
+export const publishedCoverCount = subjects.length;
+/** The full edition the magazine is building towards. */
+export const plannedCoverCount = 365;
 
 export const statusLabel: Record<WeddingStatus, string> = {
   interested: "M’intéresse",
