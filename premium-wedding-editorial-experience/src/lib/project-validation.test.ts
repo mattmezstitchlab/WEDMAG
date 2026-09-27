@@ -51,6 +51,41 @@ test("attach without a subjectId is rejected", () => {
   assert.equal(result.error, "subjectId is required");
 });
 
+test("set-state accepts the two states of the current increment", () => {
+  assert.deepEqual(parse({ action: "set-state", subjectId: "dj", state: "inspiration" }), {
+    ok: true,
+    request: { action: "set-state", subjectId: "dj", state: "inspiration" },
+  });
+  assert.deepEqual(parse({ action: "set-state", subjectId: "dj", state: "selection" }), {
+    ok: true,
+    request: { action: "set-state", subjectId: "dj", state: "selection" },
+  });
+});
+
+test("set-state refuses states outside the modelled vocabulary", () => {
+  for (const state of ["HACKED", "chosen", "", 42, null, true, ["selection"]]) {
+    const result = parse({ action: "set-state", subjectId: "dj", state });
+    assert.equal(result.ok, false, `state ${JSON.stringify(state)} must be rejected`);
+    assert.equal(result.error, "Invalid state");
+  }
+});
+
+test("set-state refuses reserved lifecycle states instead of simulating them", () => {
+  // contact, proposition, engagement, contrat, confirme, preparation,
+  // jour-j, archive are modelled but belong to future layers.
+  for (const state of ["contact", "proposition", "engagement", "contrat", "confirme", "preparation", "jour-j", "archive"]) {
+    const result = parse({ action: "set-state", subjectId: "dj", state });
+    assert.equal(result.ok, false, `state ${state} must not be settable yet`);
+    assert.equal(result.error, "state is not available yet");
+  }
+});
+
+test("set-state validates the subjectId against the catalogue", () => {
+  const result = parse({ action: "set-state", subjectId: "album", state: "selection" });
+  assert.equal(result.ok, false);
+  assert.equal(result.error, "Unknown subjectId");
+});
+
 test("rejects unknown or missing actions", () => {
   for (const body of [{}, { action: "delete" }, { action: 42 }, { subjectId: "dj" }]) {
     const result = parse(body);

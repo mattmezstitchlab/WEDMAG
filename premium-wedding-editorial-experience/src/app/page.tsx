@@ -15,7 +15,11 @@ import {
 import { mergeRestoredProject, sortWeddingSelectionsByMoment } from "@/lib/wedding-project";
 import {
   buildProjectTimeline,
+  dossierStateLabels,
   mergeRestoredWedding,
+  normalizeWeddingState,
+  settableDossierStates,
+  type DossierState,
   type WeddingProjectState,
 } from "@/lib/wedding-pacte";
 import { useDialog } from "@/lib/use-dialog";
@@ -87,11 +91,14 @@ export default function HomePage() {
   const [wedding, setWedding] = useState<WeddingProjectState | null>(null);
   const [weddingHydrated, setWeddingHydrated] = useState(false);
   const [newWeddingName, setNewWeddingName] = useState("");
+  // The dossier currently open (its cover stays its visual identity).
+  const [activeDossier, setActiveDossier] = useState<Subject | null>(null);
 
   // Escape closes, Tab is trapped, focus is moved in and restored (see
   // use-dialog). Purely keyboard/focus behaviour: no visual change.
   const sheetRef = useDialog(Boolean(activeSubject), () => setActiveSubject(null));
   const drawerRef = useDialog(drawerOpen, () => setDrawerOpen(false));
+  const dossierRef = useDialog(Boolean(activeDossier), () => setActiveDossier(null));
 
   useEffect(() => {
     let cancelled = false;
@@ -129,7 +136,9 @@ export default function HomePage() {
       let localWedding: WeddingProjectState | null = null;
       try {
         const storedWedding = window.localStorage.getItem(weddingStorageKey);
-        if (storedWedding) localWedding = JSON.parse(storedWedding) as WeddingProjectState | null;
+        // normalizeWeddingState also upgrades the previous shape (`items`)
+        // into dossiers, so an existing browser keeps its project.
+        if (storedWedding) localWedding = normalizeWeddingState(JSON.parse(storedWedding));
       } catch {
         // The wedding project remains fully usable without browser storage.
       }
@@ -140,14 +149,19 @@ export default function HomePage() {
         const response = await fetch("/api/wedding/project");
         if (response.ok) {
           const payload = (await response.json()) as {
-            project?: { name: string; items: { subjectId: string; source: string }[] } | null;
+            project?: { name: string; dossiers: { subjectId: string; state: string; source: string }[] } | null;
             persistence?: string;
           };
           weddingPersistence = payload.persistence;
           if (payload.project) {
             serverWedding = {
               name: payload.project.name,
-              items: Object.fromEntries(payload.project.items.map((item) => [item.subjectId, { source: item.source }])),
+              dossiers: Object.fromEntries(
+                payload.project.dossiers.map((dossier) => [
+                  dossier.subjectId,
+                  { state: dossier.state as DossierState, source: dossier.source },
+                ]),
+              ),
             };
           }
         }
@@ -228,6 +242,18 @@ export default function HomePage() {
     }
     setProject((current) => ({ ...current, [subject.id]: "interested" }));
     syncSelection(subject.id, "interested");
+    // A cover added to an existing wedding opens its dossier right away —
+    // the act of adding IS the selection (see WEDMAG-DOSSIERS.md).
+    if (wedding && !wedding.dossiers[subject.id]) {
+      setWedding((current) =>
+        current
+          ? { ...current, dossiers: { ...current.dossiers, [subject.id]: { state: "selection", source: "wedmag" } } }
+          : current,
+      );
+      syncWedding({ action: "attach", subjectId: subject.id });
+      setToast(`Le dossier ${subject.title} est ouvert dans votre mariage.`);
+      return;
+    }
     setToast(`${subject.title} rejoint votre mariage.`);
   };
 
@@ -246,49 +272,60 @@ export default function HomePage() {
     syncSelection(subjectId, undefined, "remove");
     // Removing the inspiration also detaches it from the wedding timeline —
     // the project never keeps something the visitor explicitly removed.
-    if (wedding?.items[subjectId]) {
+    if (wedding?.dossiers[subjectId]) {
       setWedding((current) => {
-        if (!current || !current.items[subjectId]) return current;
-        const items = { ...current.items };
-        delete items[subjectId];
-        return { ...current, items };
+        if (!current || !current.dossiers[subjectId]) return current;
+        const dossiers = { ...current.dossiers };
+        delete dossiers[subjectId];
+        return { ...current, dossiers };
       });
       syncWedding({ action: "detach", subjectId });
     }
     setToast(`${label} a été retiré.`);
   };
 
-  // --- PACTE marriage layer: create, attach, detach (propose → validate) ---
+  // --- Dossiers: create, detach, set-state (propose → validate) ---
 
   const createWedding = () => {
     const name = newWeddingName.trim() || "Mon mariage";
-    setWedding({ name, items: {} });
+    setWedding({ name, dossiers: {} });
     setNewWeddingName("");
     syncWedding({ action: "create", name });
-    setToast(`« ${name} » est créé. Rattachez vos inspirations à la timeline.`);
+    setToast(`« ${name} » est créé. Ajoutez une couverture : son dossier s'ouvrira aussitôt.`);
   };
 
   const attachSubject = (subjectId: string) => {
     const label = getSubject(subjectId)?.title ?? "Cette inspiration";
     setWedding((current) =>
       current
-        ? { ...current, items: { ...current.items, [subjectId]: { source: "wedmag" } } }
+        ? { ...current, dossiers: { ...current.dossiers, [subjectId]: { state: "selection", source: "wedmag" } } }
         : current,
     );
     syncWedding({ action: "attach", subjectId });
-    setToast(`${label} rejoint la timeline de votre mariage.`);
+    setToast(`Le dossier ${label} est ouvert dans votre mariage.`);
   };
 
   const detachSubject = (subjectId: string) => {
     const label = getSubject(subjectId)?.title ?? "Cette inspiration";
     setWedding((current) => {
-      if (!current || !current.items[subjectId]) return current;
-      const items = { ...current.items };
-      delete items[subjectId];
-      return { ...current, items };
+      if (!current || !current.dossiers[subjectId]) return current;
+      const dossiers = { ...current.dossiers };
+      delete dossiers[subjectId];
+      return { ...current, dossiers };
     });
     syncWedding({ action: "detach", subjectId });
-    setToast(`${label} retourne parmi vos inspirations.`);
+    setToast(`Le dossier ${label} retourne parmi vos inspirations.`);
+  };
+
+  const setDossierState = (subjectId: string, state: DossierState) => {
+    setWedding((current) => {
+      if (!current || !current.dossiers[subjectId]) return current;
+      return {
+        ...current,
+        dossiers: { ...current.dossiers, [subjectId]: { ...current.dossiers[subjectId], state } },
+      };
+    });
+    syncWedding({ action: "set-state", subjectId, state });
   };
 
   const organizedSelections = useMemo(
@@ -305,22 +342,26 @@ export default function HomePage() {
 
   // --- PACTE marriage layer: timeline + pool of inspirations to attach ---
 
-  const attachedItems = useMemo(
+  const attachedDossiers = useMemo(
     () =>
       wedding
-        ? Object.entries(wedding.items).map(([subjectId, item]) => ({ subjectId, source: item.source }))
+        ? Object.entries(wedding.dossiers).map(([subjectId, dossier]) => ({
+            subjectId,
+            state: dossier.state,
+            source: dossier.source,
+          }))
         : [],
     [wedding],
   );
 
-  const timeline = useMemo(() => buildProjectTimeline(attachedItems), [attachedItems]);
+  const timeline = useMemo(() => buildProjectTimeline(attachedDossiers), [attachedDossiers]);
 
   const unattachedSelections = useMemo(
     () =>
       organizedSelections
         .map((group) => ({
           ...group,
-          selections: group.selections.filter((selection) => !wedding?.items[selection.subject.id]),
+          selections: group.selections.filter((selection) => !wedding?.dossiers[selection.subject.id]),
         }))
         .filter((group) => group.selections.length > 0),
     [organizedSelections, wedding],
@@ -331,7 +372,7 @@ export default function HomePage() {
     [unattachedSelections],
   );
 
-  const attachedCount = attachedItems.length;
+  const attachedCount = attachedDossiers.length;
 
   const filteredSubjects = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -538,16 +579,16 @@ export default function HomePage() {
             {wedding && <p className="project-name">{wedding.name}</p>}
             <div className="project-line">
               <span>{wedding
-                ? `${attachedCount} ÉLÉMENT${attachedCount > 1 ? "S" : ""} RATTACHÉ${attachedCount > 1 ? "S" : ""}`
+                ? `${attachedCount} DOSSIER${attachedCount > 1 ? "S" : ""}`
                 : `${selectedSubjects.length} ÉLÉMENT${selectedSubjects.length > 1 ? "S" : ""}`}</span>
-              <span>{wedding ? "VOTRE TIMELINE SE DESSINE" : "VOTRE PROJET SE DESSINE"}</span>
+              <span>{wedding ? "VOTRE MARIAGE SE STRUCTURE" : "VOTRE PROJET SE DESSINE"}</span>
             </div>
 
             {wedding ? (
               <div className="project-content">
                 <section className="project-section">
-                  <p className="block-title">LA TIMELINE DE VOTRE MARIAGE</p>
-                  {attachedCount === 0 && <p className="timeline-hint">Rattachez une inspiration ci-dessous : elle prendra sa place dans le fil de votre journée.</p>}
+                  <div className="section-with-note"><p className="block-title">LES DOSSIERS DE VOTRE MARIAGE</p><span>LA TIMELINE</span></div>
+                  {attachedCount === 0 && <p className="timeline-hint">Ajoutez une couverture ci-dessous : son dossier s’ouvrira et prendra sa place dans le fil de votre journée.</p>}
                   <div className="project-selections">
                     {timeline.map((phase) => (
                       <div className="timeline-phase" key={phase.key ?? "other"}>
@@ -563,19 +604,26 @@ export default function HomePage() {
                               <b>{group.moment ? String(weddingMomentOrder.indexOf(group.moment) + 1).padStart(2, "0") : "—"}</b>
                               <h3>{group.moment ?? "À organiser"}</h3>
                             </div>
-                            {group.subjects.map((subject) => (
-                              <article className="project-item" key={subject.id}>
-                                <button className="project-thumb" style={{ backgroundImage: `url(${subject.image})` }} onClick={() => { setActiveSubject(subject); setDrawerOpen(false); }} aria-label={`Voir ${subject.title}`} />
-                                <div className="project-item-main">
-                                  <button onClick={() => { setActiveSubject(subject); setDrawerOpen(false); }}>{subject.title}</button>
-                                  <span>Source Wedmag · {subject.universe}</span>
-                                </div>
-                                <select value={project[subject.id] ?? "interested"} onChange={(event) => updateStatus(subject.id, event.target.value as WeddingStatus)} className={statusClass(project[subject.id] ?? "interested")} aria-label={`État de ${subject.title}`}>
-                                  <option value="interested">M’intéresse</option><option value="contacted">Contacté</option><option value="chosen">Choisi</option>
-                                </select>
-                                <button className="remove-item" onClick={() => detachSubject(subject.id)} aria-label={`Détacher ${subject.title} de la timeline`}>×</button>
-                              </article>
-                            ))}
+                            {group.subjects.map((subject) => {
+                              const dossier = wedding.dossiers[subject.id];
+                              return (
+                                <article className="project-item" key={subject.id}>
+                                  <button className="project-thumb" style={{ backgroundImage: `url(${subject.image})` }} onClick={() => { setActiveDossier(subject); setDrawerOpen(false); }} aria-label={`Ouvrir le dossier ${subject.title}`} />
+                                  <div className="project-item-main">
+                                    <button onClick={() => { setActiveDossier(subject); setDrawerOpen(false); }}>{subject.title}</button>
+                                    <span>Dossier · Source Wedmag</span>
+                                  </div>
+                                  {dossier && (
+                                    <select value={dossier.state} onChange={(event) => setDossierState(subject.id, event.target.value as DossierState)} className={dossier.state === "selection" ? "state-selection" : "state-inspiration"} aria-label={`État du dossier ${subject.title}`}>
+                                      {settableDossierStates.map((state) => (
+                                        <option key={state} value={state}>{dossierStateLabels[state]}</option>
+                                      ))}
+                                    </select>
+                                  )}
+                                  <button className="remove-item" onClick={() => detachSubject(subject.id)} aria-label={`Retirer le dossier ${subject.title} du mariage`}>×</button>
+                                </article>
+                              );
+                            })}
                           </div>
                         ))}
                       </div>
@@ -585,7 +633,7 @@ export default function HomePage() {
 
                 {unattachedCount > 0 && (
                   <section className="project-section">
-                    <div className="section-with-note"><p className="block-title">INSPIRATIONS À RATTACHER</p><span>VOUS DÉCIDEZ</span></div>
+                    <div className="section-with-note"><p className="block-title">INSPIRATIONS SANS DOSSIER</p><span>VOUS DÉCIDEZ</span></div>
                     <div className="project-selections">
                       {unattachedSelections.map((group, groupIndex) => (
                         <section className="moment-group" key={group.moment ?? "other"} aria-labelledby={`pool-moment-${groupIndex}`}>
@@ -600,7 +648,7 @@ export default function HomePage() {
                                 <button onClick={() => { setActiveSubject(subject); setDrawerOpen(false); }}>{subject.title}</button>
                                 <span>{moments.length > 1 ? `Aussi : ${moments.slice(1).join(" · ")}` : subject.universe}</span>
                               </div>
-                              <button className="attach-pill" onClick={() => attachSubject(subject.id)} aria-label={`Rattacher ${subject.title} à la timeline`}>Rattacher</button>
+                              <button className="attach-pill" onClick={() => attachSubject(subject.id)} aria-label={`Créer le dossier ${subject.title} dans votre mariage`}>Créer le dossier</button>
                               <select value={status} onChange={(event) => updateStatus(subject.id, event.target.value as WeddingStatus)} className={statusClass(status)} aria-label={`État de ${subject.title}`}>
                                 <option value="interested">M’intéresse</option><option value="contacted">Contacté</option><option value="chosen">Choisi</option>
                               </select>
@@ -691,6 +739,56 @@ export default function HomePage() {
               </div>
             )}
           </aside>
+        </div>
+      )}
+
+      {activeDossier && wedding && (
+        <div className="overlay" ref={dossierRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="dossier-title">
+          <button className="overlay-backdrop" aria-label="Fermer le dossier" onClick={() => setActiveDossier(null)} />
+          <article className="subject-sheet dossier-sheet">
+            <button className="close-sheet" onClick={() => setActiveDossier(null)} aria-label="Fermer">×</button>
+            <div className="subject-visual" style={{ backgroundImage: `url(${activeDossier.image})` }}>
+              <CoverMark number={activeDossier.coverNumber} light />
+              <div>
+                <p>DOSSIER · {wedding.name.toUpperCase()}</p>
+                <h2 id="dossier-title">{activeDossier.title}</h2>
+              </div>
+            </div>
+            <div className="subject-story">
+              <div className="dossier-state-line">
+                <span className="block-title">ÉTAT DU DOSSIER</span>
+                <div className="dossier-state-controls">
+                  {settableDossierStates.map((state) => (
+                    <button
+                      key={state}
+                      className={`state-pill ${wedding.dossiers[activeDossier.id]?.state === state ? "state-pill-active" : ""}`}
+                      onClick={() => setDossierState(activeDossier.id, state)}
+                      aria-pressed={wedding.dossiers[activeDossier.id]?.state === state}
+                    >
+                      {dossierStateLabels[state]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <p className="subject-lede">{activeDossier.intro}</p>
+              <p className="subject-description">{activeDossier.description}</p>
+
+              <div className="editorial-block">
+                <p className="block-title">DANS LE FIL DE VOTRE JOURNÉE</p>
+                <div className="tag-list">{activeDossier.moments.map((moment) => <span key={moment}>{moment}</span>)}</div>
+              </div>
+              <div className="sheet-columns">
+                <div className="editorial-block"><p className="block-title">CE QU’IL FAUDRA ORGANISER</p><ul>{activeDossier.toPlan.map((item) => <li key={item}>{item}</li>)}</ul></div>
+                <div className="editorial-block"><p className="block-title">À GARDER EN TÊTE</p><ul>{activeDossier.constraints.map((item) => <li key={item}>{item}</li>)}</ul></div>
+              </div>
+
+              <p className="dossier-next">La suite du dossier — prestataire, proposition, contrat, documents, paiements, échéances — s’ouvrira ici, étape après étape.</p>
+
+              <button className="add-wide" onClick={() => { detachSubject(activeDossier.id); setActiveDossier(null); }}>
+                RETIRER CE DOSSIER DE MON MARIAGE
+              </button>
+            </div>
+          </article>
         </div>
       )}
 

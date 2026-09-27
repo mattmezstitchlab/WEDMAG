@@ -2,7 +2,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { getDb, isDatabaseConfigured } from "@/db";
-import { weddingProjectItems, weddingProjects } from "@/db/schema";
+import { weddingDossiers, weddingProjects } from "@/db/schema";
 import { parseProjectRequest } from "@/lib/project-validation";
 
 export const dynamic = "force-dynamic";
@@ -10,10 +10,12 @@ export const dynamic = "force-dynamic";
 // Same anonymous session as the selections: one identity, one cookie.
 const cookieName = "wwm-project";
 
+type StoredDossier = { id: string; subjectId: string; state: string; source: string };
+
 type StoredProject = {
   id: string;
   name: string;
-  items: { subjectId: string; source: string }[];
+  dossiers: StoredDossier[];
 };
 
 async function loadProject(db: ReturnType<typeof getDb>, sessionId: string): Promise<StoredProject | null> {
@@ -25,13 +27,25 @@ async function loadProject(db: ReturnType<typeof getDb>, sessionId: string): Pro
 
   if (!project) return null;
 
-  const items = await db
-    .select({ subjectId: weddingProjectItems.subjectId, source: weddingProjectItems.source })
-    .from(weddingProjectItems)
-    .where(eq(weddingProjectItems.projectId, project.id))
-    .orderBy(weddingProjectItems.createdAt);
+  const dossiers = await db
+    .select({
+      id: weddingDossiers.id,
+      subjectId: weddingDossiers.subjectId,
+      state: weddingDossiers.state,
+      source: weddingDossiers.source,
+    })
+    .from(weddingDossiers)
+    .where(eq(weddingDossiers.projectId, project.id))
+    .orderBy(weddingDossiers.createdAt);
 
-  return { id: project.id, name: project.name, items };
+  return { id: project.id, name: project.name, dossiers };
+}
+
+async function touchProject(db: ReturnType<typeof getDb>, projectId: string) {
+  await db
+    .update(weddingProjects)
+    .set({ updatedAt: sql`now()` })
+    .where(eq(weddingProjects.id, projectId));
 }
 
 export async function GET() {
@@ -101,27 +115,36 @@ export async function POST(request: Request) {
       }
 
       if (action.action === "attach") {
-        // The composite primary key makes duplication impossible; the
+        // Adding a cover to the wedding opens its dossier (initial state
+        // "selection" — the act of adding IS the selection). The unique
+        // (project, subject) index makes duplication impossible; the
         // subjectId was validated against the catalogue before this point.
         await db
-          .insert(weddingProjectItems)
-          .values({ projectId: project.id, subjectId: action.subjectId, source: "wedmag" })
+          .insert(weddingDossiers)
+          .values({ projectId: project.id, subjectId: action.subjectId, state: "selection", source: "wedmag" })
           .onConflictDoNothing();
-      } else {
+      } else if (action.action === "set-state") {
         await db
-          .delete(weddingProjectItems)
+          .update(weddingDossiers)
+          .set({ state: action.state, updatedAt: sql`now()` })
           .where(
             and(
-              eq(weddingProjectItems.projectId, project.id),
-              eq(weddingProjectItems.subjectId, action.subjectId),
+              eq(weddingDossiers.projectId, project.id),
+              eq(weddingDossiers.subjectId, action.subjectId),
+            ),
+          );
+      } else {
+        await db
+          .delete(weddingDossiers)
+          .where(
+            and(
+              eq(weddingDossiers.projectId, project.id),
+              eq(weddingDossiers.subjectId, action.subjectId),
             ),
           );
       }
 
-      await db
-        .update(weddingProjects)
-        .set({ updatedAt: sql`now()` })
-        .where(eq(weddingProjects.id, project.id));
+      await touchProject(db, project.id);
     }
 
     const response = NextResponse.json({ ok: true, persistence: "server" });

@@ -2,22 +2,103 @@ import { getSubject, weddingMomentOrder, type Subject, type WeddingMoment, type 
 import { sortWeddingSelectionsByMoment } from "./wedding-project";
 
 /**
- * PACTE Mariage — client-facing domain of the wedding project layer
- * (internal model documented in PACTE-MARIAGE.md; the UI deliberately
- * exposes only a small vocabulary).
+ * WEDMAG dossiers / PACTE Mariage — client-facing domain of the wedding
+ * project layer (internal model documented in PACTE-MARIAGE.md and
+ * WEDMAG-DOSSIERS.md; the UI deliberately exposes only a small vocabulary).
  */
 
-/** A structured element of the project. MVP: a preference sourced from Wedmag. */
-export type WeddingProjectItem = {
+/**
+ * The full lifecycle of a dossier. Modelled entirely, exposed
+ * progressively: only the first states are user-settable in this increment
+ * (`settableDossierStates`); the rest is reserved for the future layers
+ * (prestataire, contrat, documents, paiements…) and is never simulated.
+ */
+export const dossierStates = [
+  "inspiration",
+  "selection",
+  "contact",
+  "proposition",
+  "engagement",
+  "contrat",
+  "confirme",
+  "preparation",
+  "jour-j",
+  "archive",
+] as const;
+
+export type DossierState = (typeof dossierStates)[number];
+
+/** Editorial labels — the only vocabulary shown to the user. */
+export const dossierStateLabels: Record<DossierState, string> = {
+  inspiration: "Inspiration",
+  selection: "Sélection",
+  contact: "Contact",
+  proposition: "Proposition",
+  engagement: "Engagement",
+  contrat: "Contrat",
+  confirme: "Confirmé",
+  preparation: "Préparation",
+  "jour-j": "Jour J",
+  archive: "Archive",
+};
+
+/** States the user may actually set in this increment (Phase 1). */
+export const settableDossierStates = ["inspiration", "selection"] as const;
+
+export function isDossierState(value: unknown): value is DossierState {
+  return typeof value === "string" && (dossierStates as readonly string[]).includes(value);
+}
+
+/**
+ * A dossier of the wedding project. Born from a cover added to the wedding,
+ * it keeps the catalogue subject as its identity (reference, never a copy).
+ */
+export type WeddingDossier = {
   subjectId: string;
+  state: DossierState;
   source: string;
 };
 
 /** Client shape of the wedding project (server rows flattened to a map). */
 export type WeddingProjectState = {
   name: string;
-  items: Record<string, { source: string }>;
+  dossiers: Record<string, { state: DossierState; source: string }>;
 };
+
+/**
+ * Normalizes a possibly older localStorage mirror: the previous shape kept
+ * `items` (the PACTE MVP inspirations) — each becomes a dossier in its
+ * default state. Nothing is invented: the attachment existed, it simply
+ * gains its dossier state.
+ */
+export function normalizeWeddingState(value: unknown): WeddingProjectState | null {
+  if (typeof value !== "object" || value === null) return null;
+
+  const { name, items, dossiers } = value as {
+    name?: unknown;
+    items?: unknown;
+    dossiers?: unknown;
+  };
+
+  if (typeof name !== "string" || !name.trim()) return null;
+
+  const normalized: WeddingProjectState = { name, dossiers: {} };
+
+  const fill = (entries: Record<string, { state?: unknown; source?: unknown }> | null | undefined) => {
+    if (typeof entries !== "object" || entries === null) return;
+    for (const [subjectId, entry] of Object.entries(entries)) {
+      normalized.dossiers[subjectId] = {
+        state: isDossierState(entry?.state) ? entry.state : "selection",
+        source: typeof entry?.source === "string" ? entry.source : "wedmag",
+      };
+    }
+  };
+
+  fill(items as Record<string, { source?: unknown }>);
+  fill(dossiers as Record<string, { state?: unknown; source?: unknown }>);
+
+  return normalized;
+}
 
 /** Snapshot of GET /api/wedding/project as seen by the client. */
 export type RestoredWeddingProject = {
@@ -72,18 +153,19 @@ const phaseByMoment = new Map<WeddingMoment, WeddingPhaseKey>(
 );
 
 /**
- * Builds the project timeline from attached items, reusing the single
- * chronological engine (`sortWeddingSelectionsByMoment`): subjects keep
- * their canonical primary moment, grouped under their phase. Items that do
- * not resolve to a catalogue subject (or have no canonical moment) fall
- * back to a trailing "À organiser" phase instead of disappearing silently.
+ * Builds the project timeline from the wedding's dossiers, reusing the
+ * single chronological engine (`sortWeddingSelectionsByMoment`): subjects
+ * keep their canonical primary moment, grouped under their phase. Dossiers
+ * that do not resolve to a catalogue subject (or have no canonical moment)
+ * fall back to a trailing "À organiser" phase instead of disappearing
+ * silently.
  */
 export function buildProjectTimeline(
-  items: readonly WeddingProjectItem[],
+  dossiers: readonly Pick<WeddingDossier, "subjectId">[],
   resolveSubject: (id: string) => Subject | undefined = getSubject,
 ): TimelinePhase[] {
-  const selections = items.map((item) => ({
-    subjectId: item.subjectId,
+  const selections = dossiers.map((dossier) => ({
+    subjectId: dossier.subjectId,
     status: "interested" as WeddingStatus,
   }));
 
@@ -138,6 +220,6 @@ export function mergeRestoredWedding(
 
   return {
     name: current.name || base.name,
-    items: { ...base.items, ...current.items },
+    dossiers: { ...base.dossiers, ...current.dossiers },
   };
 }

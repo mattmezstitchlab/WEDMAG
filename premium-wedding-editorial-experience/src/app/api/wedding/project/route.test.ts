@@ -53,6 +53,24 @@ test("POST rejects an excessively long subjectId with 400", async () => {
   assert.deepEqual(await response.json(), { error: "subjectId is too long" });
 });
 
+test("POST set-state answers honestly in local_only", async () => {
+  const response = await post({ action: "set-state", subjectId: "dj", state: "inspiration" });
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { ok: true, persistence: "local_only" });
+});
+
+test("POST set-state rejects a reserved state with 400", async () => {
+  const response = await post({ action: "set-state", subjectId: "dj", state: "contrat" });
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { error: "state is not available yet" });
+});
+
+test("POST set-state rejects an invalid state with 400", async () => {
+  const response = await post({ action: "set-state", subjectId: "dj", state: "HACKED" });
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { error: "Invalid state" });
+});
+
 test("POST rejects an invalid action with 400", async () => {
   const response = await post({ action: "delete", subjectId: "dj" });
   assert.equal(response.status, 400);

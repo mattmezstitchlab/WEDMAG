@@ -15,6 +15,13 @@
       "when": 1790512346808,
       "tag": "0001_chubby_titania",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790514163081,
+      "tag": "0002_numerous_bloodstorm",
+      "breakpoints": true
     }
   ]
 }

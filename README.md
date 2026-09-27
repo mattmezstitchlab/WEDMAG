@@ -55,8 +55,13 @@ The app degrades on purpose:
 
 The PACTE marriage layer adds `GET` / `POST /api/wedding/project` with the
 same rules: `create` (idempotent, one project per session, optional name),
-`attach` / `detach` (a `subjectId` validated against the catalogue). See
-[`PACTE-MARIAGE.md`](../PACTE-MARIAGE.md).
+`attach` (opens the subject's **dossier**, initial state `selection`) /
+`detach`, and `set-state` (dossier state). The dossier lifecycle is fully
+modelled (inspiration → sélection → contact → proposition → engagement →
+contrat → confirmé → préparation → jour J → archive) but only `inspiration`
+and `selection` are settable for now — reserved states are refused with
+`400`, never simulated. See [`PACTE-MARIAGE.md`](../PACTE-MARIAGE.md) and
+[`WEDMAG-DOSSIERS.md`](../WEDMAG-DOSSIERS.md).
 
 ### Restore rule (server vs localStorage)
 
@@ -84,9 +89,11 @@ unavailable is not replayed to the server afterwards.
 
 ## Database
 
-Two migrations exist: `wedding_selections` (selections) and, since the PACTE
-layer, `wedding_projects` / `wedding_project_items` (one anonymous project
-per session, its attached inspirations). Both are additive.
+Three migrations exist: `wedding_selections` (selections),
+`wedding_projects` + `wedding_project_items` (PACTE MVP), and
+`wedding_dossiers` (migration 0002 — the dossiers layer renames/evolves
+`wedding_project_items` non-destructively: same rows, plus a stable `id`,
+a `state` lifecycle and `updated_at`).
 
 ```bash
 npm run db:generate   # regenerate SQL after editing src/db/schema.ts

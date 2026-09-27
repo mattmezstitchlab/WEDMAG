@@ -37,23 +37,28 @@ export const weddingProjects = pgTable(
 );
 
 /**
- * PACTE Mariage — a structured element of a project. MVP: a preference
- * sourced from the Wedmag catalogue. `subjectId` is a REFERENCE into the
- * catalogue (single source of truth — never a copy of its data), and
- * `source` records the provenance ("wedmag"). The composite primary key
- * makes duplication impossible. Future layers (identities, relations,
- * engagements, documents…) are separate additive tables, not kinds here.
+ * PACTE Mariage / WEDMAG dossiers — a DOSSIER is the living unit of a
+ * wedding project (see WEDMAG-DOSSIERS.md). Born from a cover added to the
+ * wedding, it keeps the catalogue subject as its visual and editorial
+ * identity (single source of truth — `subjectId` is a REFERENCE, never a
+ * copy) and carries its own lifecycle state. Its stable `id` is the anchor
+ * every future layer (prestataire, contrat, documents, paiements,
+ * échéances) will attach to. Evolved in place from the MVP
+ * `wedding_project_items` table (non-destructive migration 0002).
  */
-export const weddingProjectItems = pgTable(
-  "wedding_project_items",
+export const weddingDossiers = pgTable(
+  "wedding_dossiers",
   {
+    id: uuid("id").primaryKey().defaultRandom(),
     projectId: uuid("project_id")
       .notNull()
       .references(() => weddingProjects.id, { onDelete: "cascade" }),
     subjectId: text("subject_id").notNull(),
+    state: text("state").notNull().default("selection"),
     source: text("source").notNull().default("wedmag"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [primaryKey({ columns: [table.projectId, table.subjectId] })],
+  (table) => [uniqueIndex("wedding_dossiers_project_subject_unique").on(table.projectId, table.subjectId)],
 );
 
