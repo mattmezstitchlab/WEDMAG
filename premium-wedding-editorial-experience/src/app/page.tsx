@@ -455,8 +455,9 @@ export default function HomePage() {
       setWedding({ name: "Mon mariage", dossiers: {} });
       syncWedding({ action: "create", name: "Mon mariage" });
     }
-    // A cover added to a wedding opens its dossier right away —
-    // the act of adding IS the selection (see WEDMAG-DOSSIERS.md).
+    // The dossier is created silently — the tick stays a pure, fast
+    // gesture: tick, filter, tick again. The dossier opens only when the
+    // couple asks for it (MON MARIAGE, or the ticked cover itself).
     if (!wedding?.dossiers[subject.id]) {
       setWedding((current) =>
         current
@@ -464,15 +465,10 @@ export default function HomePage() {
           : current,
       );
       syncWedding({ action: "attach", subjectId: subject.id });
-      // Editorial transition: the fresh dossier opens on its parcours —
-      // the couple immediately sees what this choice has become.
-      setActiveDossier(subject);
-      setToast(firstChoice
-        ? `Votre mariage est créé. Le dossier ${subject.title} s’ouvre avec son parcours.`
-        : `Le dossier ${subject.title} est créé. Nous avons préparé un parcours pour vous.`);
-      return;
     }
-    setToast(`${subject.title} rejoint votre mariage.`);
+    setToast(firstChoice
+      ? `Votre mariage est créé. ${subject.title} rejoint votre mariage.`
+      : `${subject.title} rejoint votre mariage.`);
   };
 
   const updateStatus = (subjectId: string, status: WeddingStatus) => {
@@ -507,7 +503,7 @@ export default function HomePage() {
   const createWedding = () => {
     setWedding({ name: "Mon mariage", dossiers: {} });
     syncWedding({ action: "create", name: "Mon mariage" });
-    setToast("Votre mariage est créé. Ajoutez une couverture : son dossier s’ouvrira aussitôt.");
+    setToast("Votre mariage est créé. Cochez une couverture : son dossier se créera aussitôt.");
   };
 
   const attachSubject = (subjectId: string) => {
@@ -863,7 +859,7 @@ export default function HomePage() {
               <div className="project-content">
                 <section className="project-section">
                   <div className="section-with-note"><p className="block-title">LES DOSSIERS DE VOTRE MARIAGE</p><span>LA TIMELINE</span></div>
-                  {attachedCount === 0 && <p className="timeline-hint">Ajoutez une couverture ci-dessous : son dossier s’ouvrira et prendra sa place dans le fil de votre journée.</p>}
+                  {attachedCount === 0 && <p className="timeline-hint">Cochez une couverture dans le magazine : son dossier prendra sa place dans le fil de votre journée.</p>}
                   <div className="project-selections">
                     {timeline.map((phase) => (
                       <div className="timeline-phase" key={phase.key ?? "other"}>
@@ -959,7 +955,7 @@ export default function HomePage() {
             ) : !selectedSubjects.length ? (
               <div className="project-empty">
                 <p>Votre mariage commence ici.</p>
-                <span>Cochez une première couverture : votre mariage se crée tout seul, son dossier s’ouvre avec son parcours.</span>
+                <span>Cochez une première couverture : votre mariage se crée tout seul, chaque choix devient un dossier.</span>
                 <button className="button button-fuchsia" onClick={() => { setDrawerOpen(false); scrollToMagazine(); }}>FEUILLETER <span>↓</span></button>
               </div>
             ) : (
