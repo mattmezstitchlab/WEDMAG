@@ -1159,3 +1159,33 @@ un contrat. Aucun prix, aucun contenu de devis, aucun document, aucune
   (400 — jamais en arrière), set-state proposition/engagement refusé.
 - Chemin de mise à niveau : base niveau 0006 avec un contact confirmé →
   0007 appliqué → données intactes, `proposition_at`/`engaged_at` NULL.
+
+---
+
+## Phase C — LA JOURNÉE TYPE (spécification, validée par l'utilisateur)
+
+Décision produit : le squelette est prédéfini, le contenu reste libre.
+« L'intelligence propose, l'humain décide » s'applique à la journée entière.
+
+1. **Le squelette** : `weddingDayTemplate` — les 12 moments canoniques dans
+   l'ordre, avec des heures PROPOSÉES (données éditoriales modifiables) ;
+   `null` pour les moments-périodes (Avant, Veille, Lendemain, Après) — une
+   donnée inconnue reste inconnue, WEDMAG n'invente pas d'heure.
+   Préparatifs 11:00 · Cérémonie 15:00 · Couple 17:00 · Cocktail 18:00 ·
+   Dîner 20:30 · Première danse 22:30 · Soirée 23:00 · Brunch 11:00.
+2. **La vue** : `buildWeddingDay(dossiers)` — chaque phase liste TOUS ses
+   moments, même vides (« à garnir »). `buildProjectTimeline` (le moteur)
+   reste inchangé.
+3. **Les heures** : surcharges du couple (`momentHours`, moment → "HH:MM"
+   strict). Absent = heure proposée. Colonne `moment_hours` jsonb sur
+   wedding_projects (migration 0008, aucun backfill — l'absence EST la
+   proposition). Action `moment-hour {moment, hour|null}` (null = retour à
+   la proposition). Normalisation : moment connu + format HH:MM, sinon jeté.
+4. **Les vrais prestataires** : réutilisés des dossiers cochés (chaîne B1/B2
+   telle quelle). Chaque moment affiche ses personnes déclarées
+   (statut ≠ sélectionné) — aucun nouveau registre, pas de CRM.
+5. **Le tiroir** : la section devient « VOTRE JOURNÉE — LES HEURES SONT À
+   VOUS » ; moment par moment : heure éditable, couvertures cochées,
+   personnes déclarées. Le tiroir vide montre la journée type en aperçu.
+6. Intouchés : moteur timeline, parcours, contacts, PACTE, homepage.
+   Hors périmètre : heures imposées, durée, lieux, coordination automatique.
