@@ -1116,3 +1116,32 @@ Le périmètre exact validé, rien de plus :
   strings UI B1 présentes dans le bundle client.
 - Moon Phase : **aucun code** — reste sur son audit validé
   (MOON-PHASE.md), produit séparé, jusqu'à nouvel ordre.
+
+---
+
+## B2 — LA PROPOSITION & LE CHOIX (spécification, validée par l'utilisateur)
+
+Suite exacte de la chaîne déclarative de B1 : chaque nouveau fait est une
+**déclaration du couple**, horodatée, jamais vérifiée, jamais présentée comme
+un contrat. Aucun prix, aucun contenu de devis, aucun document, aucune
+échéance stockés — ces couches restent B3+.
+
+1. **`proposition`** (4ᵉ statut contact) : le couple déclare avoir reçu la
+   proposition d'un professionnel. Colonne `proposition_at` (timestamptz,
+   NULL). Séquence stricte : `confirme` → `proposition` (sinon 400).
+   Effet dossier : état `proposition`, jamais en arrière, jamais via set-state.
+2. **`engage`** (5ᵉ statut contact) : le couple déclare l'avoir choisi — LA
+   décision. Colonne `engaged_at` (timestamptz, NULL). Séquence stricte :
+   `proposition` → `engage` (sinon 400). Effet dossier : état `engagement`.
+
+- API : `contact-proposition` / `contact-engage` {subjectId, contactId, note?}
+  — miroir exact de contact-confirm (validation) et contact-attest (déplacement
+  d'état dossier atomique dans une transaction).
+- Le dossier ne recule jamais (proposition n'écrase pas engagement).
+- `settableDossierStates` reste [inspiration, selection] ; set-state refuse
+  toujours contact/proposition/engagement.
+- Statut contact ≠ état dossier (unchanged).
+- Libellés : Proposition / Choisi. Boutons : « NOUS AVONS REÇU SA PROPOSITION »,
+  « NOUS L'AVONS CHOISI ».
+- Hors périmètre B2 : prix, contenu de devis, contrat, documents, paiement,
+  échéances, timeline, adaptation automatique du parcours, registre global, CRM.
