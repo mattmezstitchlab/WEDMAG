@@ -18,6 +18,43 @@ export const weddingMomentOrder = [
 
 export type WeddingMoment = (typeof weddingMomentOrder)[number];
 
+/**
+ * LA JOURNÉE TYPE — the pre-drawn day. One entry per canonical moment, in
+ * canonical order: the skeleton the couple opens first, with PROPOSED hours
+ * (editorial data, modifiable — the couple decides). `null` marks a period
+ * moment (not a clock moment): WEDMAG invents no time for it.
+ */
+export const weddingDayTemplate: { moment: WeddingMoment; hour: string | null }[] = [
+  { moment: "Avant le mariage", hour: null },
+  { moment: "Veille du mariage", hour: null },
+  { moment: "Préparatifs", hour: "11:00" },
+  { moment: "Cérémonie", hour: "15:00" },
+  { moment: "Cocktail", hour: "18:00" },
+  { moment: "Couple", hour: "18:30" },
+  { moment: "Dîner", hour: "20:30" },
+  { moment: "Première danse", hour: "22:30" },
+  { moment: "Soirée", hour: "23:00" },
+  { moment: "Lendemain", hour: null },
+  { moment: "Brunch", hour: "11:00" },
+  { moment: "Après le mariage", hour: null },
+];
+
+/** Proposed hour per moment — single source: the template above. */
+export const proposedMomentHours = Object.fromEntries(
+  weddingDayTemplate.map((entry) => [entry.moment, entry.hour]),
+) as Record<WeddingMoment, string | null>;
+
+/** A couple-declared hour is a strict HH:MM (24h) string — nothing else. */
+const hourPattern = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+export function isWeddingMoment(value: unknown): value is WeddingMoment {
+  return typeof value === "string" && (weddingMomentOrder as readonly string[]).includes(value);
+}
+
+export function isMomentHour(value: unknown): value is string {
+  return typeof value === "string" && hourPattern.test(value);
+}
+
 export type Subject = {
   id: string;
   coverNumber: number;
@@ -39,7 +76,7 @@ export type Subject = {
   constraints: string[];
   resources: string[];
   related: string[];
-  professionals: { name: string; role: string; city: string }[];
+  professionals: Professional[];
 };
 
 export const images = [
@@ -53,7 +90,32 @@ export const images = [
   "https://images.pexels.com/photos/8516921/pexels-photo-8516921.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=1400&w=900",
 ];
 
-const pro = (name: string, role: string, city: string) => ({ name, role, city });
+/**
+ * A catalogue professional is an EDITORIAL REFERENCE (an illustration of the
+ * universe, like the images or the style) — never a tracked person: no
+ * contact details, no availability, no price, no qualification. The stable
+ * `id` is derived from the name and is unique within its subject (9 names
+ * are deliberately shared by two subjects; a contact therefore references
+ * the PAIR subjectId + professionalId, never the name alone).
+ */
+export type Professional = { id: string; name: string; role: string; city: string };
+
+const slugify = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[\u2019'"]/g, "")
+    .replace(/&/g, " ")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+const pro = (name: string, role: string, city: string): Professional => ({
+  id: slugify(name),
+  name,
+  role,
+  city,
+});
 
 export const subjects: Subject[] = [
   {
@@ -289,4 +351,21 @@ export const statusLabel: Record<WeddingStatus, string> = {
 
 export function getSubject(id: string) {
   return subjects.find((subject) => subject.id === id);
+}
+
+/**
+ * Resolves a catalogue professional reference ("subjectId:professionalId")
+ * within a subject's own universe. The reference is only valid when its
+ * subject part IS the given subject (a dossier may only follow a
+ * professional from its own subject's editorial universe) and the
+ * professional id resolves — anything else is unknown, never coerced.
+ */
+export function getSubjectProfessional(subjectId: string, professionalRef: string): Professional | undefined {
+  const separator = professionalRef.indexOf(":");
+  if (separator <= 0 || separator === professionalRef.length - 1) return undefined;
+  if (professionalRef.slice(0, separator) !== subjectId) return undefined;
+  const subject = getSubject(subjectId);
+  if (!subject) return undefined;
+  const professionalId = professionalRef.slice(separator + 1);
+  return subject.professionals.find((professional) => professional.id === professionalId);
 }

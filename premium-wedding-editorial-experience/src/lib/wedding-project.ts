@@ -23,6 +23,41 @@ export type WeddingSelectionGroup = {
   selections: OrganizedWeddingSelection[];
 };
 
+/** Snapshot of GET /api/wedding/selections as seen by the client. */
+export type RestoredServerProject = {
+  persistence?: string;
+  selections: Record<string, WeddingStatus>;
+};
+
+/**
+ * Deterministic restore rule for the project loaded from localStorage and
+ * the server (see README, "Restore rule"):
+ *
+ * - `local_only`, `unavailable` or a failed fetch → localStorage is the
+ *   project; no server state exists to compete with it.
+ * - `server` with a non-empty snapshot → the server snapshot is
+ *   authoritative. A selection removed from another browser therefore
+ *   disappears here instead of being resurrected by stale localStorage.
+ * - `server` with an empty snapshot → localStorage is kept: an empty
+ *   snapshot cannot distinguish "never synced" from "everything was
+ *   removed elsewhere", and the non-destructive choice wins.
+ * - Anything ticked while the restore was in flight (`current`) always
+ *   wins: loading must never discard live choices.
+ *
+ * Known, accepted limitation: selections made while offline (their POST
+ * failed silently) can be dropped from the view when a non-empty server
+ * snapshot is later restored.
+ */
+export function mergeRestoredProject(
+  server: RestoredServerProject,
+  local: Record<string, WeddingStatus>,
+  current: Record<string, WeddingStatus>,
+): Record<string, WeddingStatus> {
+  const serverIsAuthoritative =
+    server.persistence === "server" && Object.keys(server.selections).length > 0;
+  return { ...(serverIsAuthoritative ? server.selections : local), ...current };
+}
+
 const momentPosition = new Map<WeddingMoment, number>(
   weddingMomentOrder.map((moment, index) => [moment, index]),
 );

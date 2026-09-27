@@ -1,0 +1,1 @@
+ALTER TABLE "wedding_projects" ADD COLUMN "moment_hours" jsonb DEFAULT '{}'::jsonb NOT NULL;

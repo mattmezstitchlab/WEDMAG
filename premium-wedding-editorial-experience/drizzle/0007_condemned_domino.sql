@@ -1,0 +1,2 @@
+ALTER TABLE "wedding_dossier_contacts" ADD COLUMN "proposition_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "wedding_dossier_contacts" ADD COLUMN "engaged_at" timestamp with time zone;
