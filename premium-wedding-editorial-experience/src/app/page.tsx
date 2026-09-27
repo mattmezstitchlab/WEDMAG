@@ -13,11 +13,17 @@ import {
   type WeddingStatus,
 } from "@/lib/wedding-data";
 import { mergeRestoredProject, sortWeddingSelectionsByMoment } from "@/lib/wedding-project";
+import {
+  buildProjectTimeline,
+  mergeRestoredWedding,
+  type WeddingProjectState,
+} from "@/lib/wedding-pacte";
 import { useDialog } from "@/lib/use-dialog";
 
 type SelectionMap = Record<string, WeddingStatus>;
 
 const storageKey = "world-wedding-magazine-project";
+const weddingStorageKey = "world-wedding-magazine-wedding";
 
 function statusClass(status: WeddingStatus) {
   return status === "chosen" ? "status-chosen" : status === "contacted" ? "status-contacted" : "status-interested";
@@ -34,6 +40,39 @@ function CoverMark({ number, light = false }: { number: number; light?: boolean 
   );
 }
 
+/**
+ * PACTE marriage layer — the single step from editorial inspiration to a
+ * structured project. One optional name, nothing else: the system learns
+ * progressively from validated actions, never from a giant form.
+ */
+function CreateWeddingSection({
+  name,
+  onNameChange,
+  onCreate,
+}: {
+  name: string;
+  onNameChange: (value: string) => void;
+  onCreate: () => void;
+}) {
+  return (
+    <section className="project-section create-section">
+      <p className="section-kicker">DE L’INSPIRATION AU PROJET</p>
+      <p className="create-lede">Vos inspirations peuvent devenir la matière d’un vrai projet : une timeline, des éléments reliés, des décisions qui vous appartiennent.</p>
+      <div className="create-field">
+        <input
+          value={name}
+          onChange={(event) => onNameChange(event.target.value)}
+          placeholder="Mon mariage"
+          aria-label="Nom de votre projet mariage"
+          maxLength={80}
+        />
+        <button className="button button-fuchsia" onClick={onCreate}>CRÉER MON PROJET <span>→</span></button>
+      </div>
+    </section>
+  );
+}
+
+
 export default function HomePage() {
   const [project, setProject] = useState<SelectionMap>({});
   const [activeSubject, setActiveSubject] = useState<Subject | null>(null);
@@ -42,6 +81,12 @@ export default function HomePage() {
   const [universe, setUniverse] = useState("Tous");
   const [toast, setToast] = useState<string | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
+
+  // PACTE marriage layer: the structured wedding project (null until the
+  // visitor creates it — inspirations live in `project` until then).
+  const [wedding, setWedding] = useState<WeddingProjectState | null>(null);
+  const [weddingHydrated, setWeddingHydrated] = useState(false);
+  const [newWeddingName, setNewWeddingName] = useState("");
 
   // Escape closes, Tab is trapped, focus is moved in and restored (see
   // use-dialog). Purely keyboard/focus behaviour: no visual change.
@@ -81,6 +126,35 @@ export default function HomePage() {
         // Server persistence is progressive enhancement.
       }
 
+      let localWedding: WeddingProjectState | null = null;
+      try {
+        const storedWedding = window.localStorage.getItem(weddingStorageKey);
+        if (storedWedding) localWedding = JSON.parse(storedWedding) as WeddingProjectState | null;
+      } catch {
+        // The wedding project remains fully usable without browser storage.
+      }
+
+      let serverWedding: WeddingProjectState | null = null;
+      let weddingPersistence: string | undefined;
+      try {
+        const response = await fetch("/api/wedding/project");
+        if (response.ok) {
+          const payload = (await response.json()) as {
+            project?: { name: string; items: { subjectId: string; source: string }[] } | null;
+            persistence?: string;
+          };
+          weddingPersistence = payload.persistence;
+          if (payload.project) {
+            serverWedding = {
+              name: payload.project.name,
+              items: Object.fromEntries(payload.project.items.map((item) => [item.subjectId, { source: item.source }])),
+            };
+          }
+        }
+      } catch {
+        // Server persistence is progressive enhancement.
+      }
+
       if (cancelled) return;
       // Deterministic restore rule (see mergeRestoredProject): the server
       // snapshot wins when it has content, localStorage otherwise, and
@@ -91,6 +165,13 @@ export default function HomePage() {
         current,
       ));
       setIsHydrated(true);
+      // Same rule for the wedding project itself (mergeRestoredWedding).
+      setWedding((current) => mergeRestoredWedding(
+        { persistence: weddingPersistence, project: serverWedding },
+        localWedding,
+        current,
+      ));
+      setWeddingHydrated(true);
     };
 
     void restoreProject();
@@ -110,6 +191,15 @@ export default function HomePage() {
   }, [project, isHydrated]);
 
   useEffect(() => {
+    if (!weddingHydrated) return;
+    try {
+      window.localStorage.setItem(weddingStorageKey, JSON.stringify(wedding));
+    } catch {
+      // Local persistence is progressive enhancement.
+    }
+  }, [wedding, weddingHydrated]);
+
+  useEffect(() => {
     if (!toast) return;
     const timer = window.setTimeout(() => setToast(null), 3000);
     return () => window.clearTimeout(timer);
@@ -120,6 +210,14 @@ export default function HomePage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ subjectId, status, action }),
+    }).catch(() => undefined);
+  };
+
+  const syncWedding = (body: Record<string, unknown>) => {
+    void fetch("/api/wedding/project", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
     }).catch(() => undefined);
   };
 
@@ -146,7 +244,51 @@ export default function HomePage() {
       return next;
     });
     syncSelection(subjectId, undefined, "remove");
+    // Removing the inspiration also detaches it from the wedding timeline —
+    // the project never keeps something the visitor explicitly removed.
+    if (wedding?.items[subjectId]) {
+      setWedding((current) => {
+        if (!current || !current.items[subjectId]) return current;
+        const items = { ...current.items };
+        delete items[subjectId];
+        return { ...current, items };
+      });
+      syncWedding({ action: "detach", subjectId });
+    }
     setToast(`${label} a été retiré.`);
+  };
+
+  // --- PACTE marriage layer: create, attach, detach (propose → validate) ---
+
+  const createWedding = () => {
+    const name = newWeddingName.trim() || "Mon mariage";
+    setWedding({ name, items: {} });
+    setNewWeddingName("");
+    syncWedding({ action: "create", name });
+    setToast(`« ${name} » est créé. Rattachez vos inspirations à la timeline.`);
+  };
+
+  const attachSubject = (subjectId: string) => {
+    const label = getSubject(subjectId)?.title ?? "Cette inspiration";
+    setWedding((current) =>
+      current
+        ? { ...current, items: { ...current.items, [subjectId]: { source: "wedmag" } } }
+        : current,
+    );
+    syncWedding({ action: "attach", subjectId });
+    setToast(`${label} rejoint la timeline de votre mariage.`);
+  };
+
+  const detachSubject = (subjectId: string) => {
+    const label = getSubject(subjectId)?.title ?? "Cette inspiration";
+    setWedding((current) => {
+      if (!current || !current.items[subjectId]) return current;
+      const items = { ...current.items };
+      delete items[subjectId];
+      return { ...current, items };
+    });
+    syncWedding({ action: "detach", subjectId });
+    setToast(`${label} retourne parmi vos inspirations.`);
   };
 
   const organizedSelections = useMemo(
@@ -160,6 +302,36 @@ export default function HomePage() {
     () => organizedSelections.flatMap((group) => group.selections.map((selection) => selection.subject)),
     [organizedSelections],
   );
+
+  // --- PACTE marriage layer: timeline + pool of inspirations to attach ---
+
+  const attachedItems = useMemo(
+    () =>
+      wedding
+        ? Object.entries(wedding.items).map(([subjectId, item]) => ({ subjectId, source: item.source }))
+        : [],
+    [wedding],
+  );
+
+  const timeline = useMemo(() => buildProjectTimeline(attachedItems), [attachedItems]);
+
+  const unattachedSelections = useMemo(
+    () =>
+      organizedSelections
+        .map((group) => ({
+          ...group,
+          selections: group.selections.filter((selection) => !wedding?.items[selection.subject.id]),
+        }))
+        .filter((group) => group.selections.length > 0),
+    [organizedSelections, wedding],
+  );
+
+  const unattachedCount = useMemo(
+    () => unattachedSelections.reduce((count, group) => count + group.selections.length, 0),
+    [unattachedSelections],
+  );
+
+  const attachedCount = attachedItems.length;
 
   const filteredSubjects = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -360,20 +532,116 @@ export default function HomePage() {
           <button className="drawer-backdrop" onClick={() => setDrawerOpen(false)} aria-label="Fermer Mon mariage" />
           <aside className="project-drawer" ref={drawerRef} tabIndex={-1}>
             <div className="drawer-head">
-              <div><p className="section-kicker">VOTRE ÉDITION PERSONNELLE</p><h2 id="project-title">MON<br /><i>MARIAGE.</i></h2></div>
+              <div><p className="section-kicker">{wedding ? "VOTRE PROJET MARIAGE" : "VOTRE ÉDITION PERSONNELLE"}</p><h2 id="project-title">MON<br /><i>MARIAGE.</i></h2></div>
               <button className="drawer-close" onClick={() => setDrawerOpen(false)} aria-label="Fermer">×</button>
             </div>
-            <div className="project-line"><span>{selectedSubjects.length} ÉLÉMENT{selectedSubjects.length > 1 ? "S" : ""}</span><span>VOTRE PROJET SE DESSINE</span></div>
+            {wedding && <p className="project-name">{wedding.name}</p>}
+            <div className="project-line">
+              <span>{wedding
+                ? `${attachedCount} ÉLÉMENT${attachedCount > 1 ? "S" : ""} RATTACHÉ${attachedCount > 1 ? "S" : ""}`
+                : `${selectedSubjects.length} ÉLÉMENT${selectedSubjects.length > 1 ? "S" : ""}`}</span>
+              <span>{wedding ? "VOTRE TIMELINE SE DESSINE" : "VOTRE PROJET SE DESSINE"}</span>
+            </div>
 
-            {!selectedSubjects.length ? (
+            {wedding ? (
+              <div className="project-content">
+                <section className="project-section">
+                  <p className="block-title">LA TIMELINE DE VOTRE MARIAGE</p>
+                  {attachedCount === 0 && <p className="timeline-hint">Rattachez une inspiration ci-dessous : elle prendra sa place dans le fil de votre journée.</p>}
+                  <div className="project-selections">
+                    {timeline.map((phase) => (
+                      <div className="timeline-phase" key={phase.key ?? "other"}>
+                        <div className="phase-heading">
+                          <b>{phase.number ?? "—"}</b>
+                          <h3>{phase.label}</h3>
+                        </div>
+                        {phase.momentGroups.length === 0 ? (
+                          <p className="phase-empty">Rien pour l’instant.</p>
+                        ) : phase.momentGroups.map((group) => (
+                          <div className="moment-group" key={group.moment ?? "other"}>
+                            <div className="moment-heading">
+                              <b>{group.moment ? String(weddingMomentOrder.indexOf(group.moment) + 1).padStart(2, "0") : "—"}</b>
+                              <h3>{group.moment ?? "À organiser"}</h3>
+                            </div>
+                            {group.subjects.map((subject) => (
+                              <article className="project-item" key={subject.id}>
+                                <button className="project-thumb" style={{ backgroundImage: `url(${subject.image})` }} onClick={() => { setActiveSubject(subject); setDrawerOpen(false); }} aria-label={`Voir ${subject.title}`} />
+                                <div className="project-item-main">
+                                  <button onClick={() => { setActiveSubject(subject); setDrawerOpen(false); }}>{subject.title}</button>
+                                  <span>Source Wedmag · {subject.universe}</span>
+                                </div>
+                                <select value={project[subject.id] ?? "interested"} onChange={(event) => updateStatus(subject.id, event.target.value as WeddingStatus)} className={statusClass(project[subject.id] ?? "interested")} aria-label={`État de ${subject.title}`}>
+                                  <option value="interested">M’intéresse</option><option value="contacted">Contacté</option><option value="chosen">Choisi</option>
+                                </select>
+                                <button className="remove-item" onClick={() => detachSubject(subject.id)} aria-label={`Détacher ${subject.title} de la timeline`}>×</button>
+                              </article>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                </section>
+
+                {unattachedCount > 0 && (
+                  <section className="project-section">
+                    <div className="section-with-note"><p className="block-title">INSPIRATIONS À RATTACHER</p><span>VOUS DÉCIDEZ</span></div>
+                    <div className="project-selections">
+                      {unattachedSelections.map((group, groupIndex) => (
+                        <section className="moment-group" key={group.moment ?? "other"} aria-labelledby={`pool-moment-${groupIndex}`}>
+                          <div className="moment-heading">
+                            <b>{group.moment ? String(weddingMomentOrder.indexOf(group.moment) + 1).padStart(2, "0") : "—"}</b>
+                            <h3 id={`pool-moment-${groupIndex}`}>{group.moment ?? "À organiser"}</h3>
+                          </div>
+                          {group.selections.map(({ subject, status, moments }) => (
+                            <article className="project-item pool-item" key={subject.id}>
+                              <button className="project-thumb" style={{ backgroundImage: `url(${subject.image})` }} onClick={() => { setActiveSubject(subject); setDrawerOpen(false); }} aria-label={`Voir ${subject.title}`} />
+                              <div className="project-item-main">
+                                <button onClick={() => { setActiveSubject(subject); setDrawerOpen(false); }}>{subject.title}</button>
+                                <span>{moments.length > 1 ? `Aussi : ${moments.slice(1).join(" · ")}` : subject.universe}</span>
+                              </div>
+                              <button className="attach-pill" onClick={() => attachSubject(subject.id)} aria-label={`Rattacher ${subject.title} à la timeline`}>Rattacher</button>
+                              <select value={status} onChange={(event) => updateStatus(subject.id, event.target.value as WeddingStatus)} className={statusClass(status)} aria-label={`État de ${subject.title}`}>
+                                <option value="interested">M’intéresse</option><option value="contacted">Contacté</option><option value="chosen">Choisi</option>
+                              </select>
+                              <button className="remove-item" onClick={() => removeSubject(subject.id)} aria-label={`Retirer ${subject.title}`}>×</button>
+                            </article>
+                          ))}
+                        </section>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                <section className="project-section project-reading">
+                  <p className="block-title">VOTRE PROJET, À CE STADE</p>
+                  <p>Vous avez déjà dessiné <strong>{Array.from(new Set(selectedSubjects.map((subject) => subject.universe))).join(", ")}</strong>. Voici des pistes nées de vos choix — à examiner seulement si elles vous ressemblent.</p>
+                </section>
+
+                {insights.toCheck.length > 0 && <section className="project-section check-section">
+                  <p className="block-title">À VÉRIFIER</p>
+                  <div className="check-list">{insights.toCheck.map((item) => <span key={item}><b>↗</b>{item}</span>)}</div>
+                </section>}
+
+                {insights.suggestions.length > 0 && <section className="project-section">
+                  <div className="section-with-note"><p className="block-title">ÉLÉMENTS ASSOCIÉS</p><span>LIENS ENTRE VOS CHOIX</span></div>
+                  <div className="suggestion-list">{insights.suggestions.map(({ subject, links }) => <article key={subject.id}>
+                    <div className="suggestion-image" style={{ backgroundImage: `url(${subject.image})` }} /><div><p>{subject.title}</p><span>Apparaît dans {links} relation{links > 1 ? "s" : ""}</span></div><button onClick={() => addSubject(subject)}>+</button>
+                  </article>)}</div>
+                </section>}
+
+                <button className="back-to-magazine" onClick={() => { setDrawerOpen(false); scrollToMagazine(); }}>← CONTINUER À FEUILLETER</button>
+              </div>
+            ) : !selectedSubjects.length ? (
               <div className="project-empty">
                 <p>Votre édition est encore blanche.</p>
                 <span>Feuilletez les couvertures, cochez ce qui vous touche. Ici, les relations commenceront à apparaître.</span>
                 <button className="button button-fuchsia" onClick={() => { setDrawerOpen(false); scrollToMagazine(); }}>FEUILLETER <span>↓</span></button>
+                <CreateWeddingSection name={newWeddingName} onNameChange={setNewWeddingName} onCreate={createWedding} />
               </div>
             ) : (
               <div className="project-content">
-                <section className="project-section selected-section">
+                <section className="project-section">
                   <p className="block-title">CE QUE VOUS AVEZ CHOISI</p>
                   <div className="project-selections">
                     {organizedSelections.map((group, groupIndex) => (
@@ -410,12 +678,14 @@ export default function HomePage() {
                   <div className="check-list">{insights.toCheck.map((item) => <span key={item}><b>↗</b>{item}</span>)}</div>
                 </section>}
 
-                {insights.suggestions.length > 0 && <section className="project-section suggestion-section">
+                {insights.suggestions.length > 0 && <section className="project-section">
                   <div className="section-with-note"><p className="block-title">ÉLÉMENTS ASSOCIÉS</p><span>LIENS ENTRE VOS CHOIX</span></div>
                   <div className="suggestion-list">{insights.suggestions.map(({ subject, links }) => <article key={subject.id}>
                     <div className="suggestion-image" style={{ backgroundImage: `url(${subject.image})` }} /><div><p>{subject.title}</p><span>Apparaît dans {links} relation{links > 1 ? "s" : ""}</span></div><button onClick={() => addSubject(subject)}>+</button>
                   </article>)}</div>
                 </section>}
+
+                <CreateWeddingSection name={newWeddingName} onNameChange={setNewWeddingName} onCreate={createWedding} />
 
                 <button className="back-to-magazine" onClick={() => { setDrawerOpen(false); scrollToMagazine(); }}>← CONTINUER À FEUILLETER</button>
               </div>

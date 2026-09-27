@@ -53,6 +53,11 @@ The app degrades on purpose:
 - absent `status` keeps the documented default (`interested`), matching the
   schema's own default.
 
+The PACTE marriage layer adds `GET` / `POST /api/wedding/project` with the
+same rules: `create` (idempotent, one project per session, optional name),
+`attach` / `detach` (a `subjectId` validated against the catalogue). See
+[`PACTE-MARIAGE.md`](../PACTE-MARIAGE.md).
+
 ### Restore rule (server vs localStorage)
 
 On load, the project is restored in one pass with a deterministic rule
@@ -71,9 +76,17 @@ Known, accepted limitation: selections made while offline (their POST
 failed silently) can be dropped from the view when a non-empty server
 snapshot is later restored.
 
+The wedding project itself (`Mon mariage` → `Créer mon projet`) follows the
+symmetric rule (`mergeRestoredWedding`): a non-null `server` project is
+authoritative, otherwise `localStorage` keeps it, and anything created or
+attached while loading wins. A project created while the database was
+unavailable is not replayed to the server afterwards.
+
 ## Database
 
-The `wedding_selections` table must be created before server persistence works.
+Two migrations exist: `wedding_selections` (selections) and, since the PACTE
+layer, `wedding_projects` / `wedding_project_items` (one anonymous project
+per session, its attached inspirations). Both are additive.
 
 ```bash
 npm run db:generate   # regenerate SQL after editing src/db/schema.ts

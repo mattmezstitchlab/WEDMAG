@@ -20,6 +20,33 @@ const catalogueIds = new Set(subjects.map((subject) => subject.id));
  */
 const maxSubjectIdLength = 64;
 
+export type SubjectIdCheck =
+  | { ok: true; subjectId: string }
+  | { ok: false; error: string };
+
+/**
+ * Validates a subjectId against the catalogue (single source of truth).
+ * Shared by every write path that references a catalogue subject, so the
+ * "one validation, one vocabulary" rule holds everywhere.
+ */
+export function validateSubjectId(value: unknown): SubjectIdCheck {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    return { ok: false, error: "subjectId is required" };
+  }
+
+  const subjectId = value.trim();
+
+  if (subjectId.length > maxSubjectIdLength) {
+    return { ok: false, error: "subjectId is too long" };
+  }
+
+  if (!catalogueIds.has(subjectId)) {
+    return { ok: false, error: "Unknown subjectId" };
+  }
+
+  return { ok: true, subjectId };
+}
+
 export type SelectionWrite =
   | { kind: "upsert"; subjectId: string; status: WeddingStatus }
   | { kind: "remove"; subjectId: string };
@@ -50,19 +77,13 @@ export function parseSelectionRequest(body: unknown): SelectionParse {
     action?: unknown;
   };
 
-  if (typeof subjectId !== "string" || subjectId.trim().length === 0) {
-    return { ok: false, error: "subjectId is required" };
+  const idCheck = validateSubjectId(subjectId);
+
+  if (!idCheck.ok) {
+    return { ok: false, error: idCheck.error };
   }
 
-  const trimmedId = subjectId.trim();
-
-  if (trimmedId.length > maxSubjectIdLength) {
-    return { ok: false, error: "subjectId is too long" };
-  }
-
-  if (!catalogueIds.has(trimmedId)) {
-    return { ok: false, error: "Unknown subjectId" };
-  }
+  const trimmedId = idCheck.subjectId;
 
   // A status, when present, must be an officially defined one — even on a
   // removal, so that garbage can never travel through a valid request.
