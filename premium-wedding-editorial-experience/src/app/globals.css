@@ -71,7 +71,7 @@ h1 i, h2 i { font-family: Georgia, "Times New Roman", serif; font-weight: 400; l
 .manifesto-steps p { max-width: 340px; margin: -4px 0 0; font-family: Georgia, "Times New Roman", serif; font-size: 19px; line-height: 1.15; }
 /* --- Homepage update: the concept, stated editorially --- */
 .concept-steps b { display: block; margin: -2px 0 7px; font-size: 12px; font-weight: 800; letter-spacing: .14em; }
-.concept-steps em { display: block; max-width: 340px; margin-top: 9px; font-family: Georgia, "Times New Roman", serif; font-style: italic; font-size: 13px; line-height: 1.4; color: var(--muted); }
+.concept-steps p { max-width: 560px; }
 
 .statement { background: var(--ink); color: var(--paper); padding: 108px 7.6vw 96px; text-align: center; }
 .statement-line { font-size: clamp(21px, 3vw, 40px); font-weight: 900; letter-spacing: -.02em; line-height: 1.18; max-width: 21em; margin: 0 auto; }
@@ -85,23 +85,19 @@ h1 i, h2 i { font-family: Georgia, "Times New Roman", serif; font-weight: 400; l
 .feature-body .section-kicker { margin-bottom: 22px; }
 .feature-body h2 { font-size: clamp(40px, 4.6vw, 74px); line-height: .88; letter-spacing: -.06em; font-weight: 900; margin: 0 0 26px; }
 .feature-text { font-family: Georgia, "Times New Roman", serif; font-size: 19px; line-height: 1.5; max-width: 32em; margin: 0; }
-.feature-list { list-style: none; display: grid; gap: 0; margin: 30px 0 0; padding: 0; }
-.feature-list li { display: grid; grid-template-columns: 118px 1fr; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--line); }
-.feature-list li:last-child { border-bottom: 0; }
-.feature-list b { font-size: 10px; font-weight: 800; letter-spacing: .18em; color: var(--hot); padding-top: 3px; }
-.feature-list span { font-family: Georgia, "Times New Roman", serif; font-size: 15px; line-height: 1.45; }
+.feature-tags { list-style: none; display: flex; flex-wrap: wrap; gap: 9px; margin: 30px 0 0; padding: 0; }
+.feature-tags li { padding: 10px 15px; border: 1px solid var(--line); font-size: 10px; font-weight: 800; letter-spacing: .18em; }
 
 .timeline-section { padding: 100px 7.6vw 110px; }
 .timeline-section .section-kicker { margin-bottom: 20px; }
-.timeline-section h2 { font-size: clamp(44px, 5.4vw, 84px); line-height: .86; letter-spacing: -.07em; font-weight: 900; margin: 0 0 22px; }
-.timeline-text { max-width: 38em; }
+.timeline-section h2 { font-size: clamp(44px, 5.4vw, 84px); line-height: .86; letter-spacing: -.07em; font-weight: 900; margin: 0; }
 .timeline-preview { margin-top: 44px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; }
 .timeline-preview > div { padding: 20px 0 4px; border-top: 3px solid var(--ink); }
 .timeline-preview b { color: var(--hot); font-size: 13px; font-weight: 800; letter-spacing: .06em; }
 .timeline-preview h3 { margin: 8px 0 10px; font-size: 21px; font-weight: 900; letter-spacing: -.02em; }
 .timeline-preview span { font-family: Georgia, "Times New Roman", serif; font-size: 14px; line-height: 1.55; color: var(--muted); }
 
-.closing-cta .closing-note { font-family: Georgia, "Times New Roman", serif; font-size: 19px; line-height: 1.5; margin: -16px 0 36px; max-width: 30em; }
+
 
 .magazine { padding: 97px 3.1vw 117px; background: #dcd7cd; }
 .magazine-head { display: flex; justify-content: space-between; align-items: end; max-width: 1280px; margin: 0 auto 45px; }
@@ -238,7 +234,7 @@ footer { min-height: 160px; background: var(--ink); color: white; padding: 38px 
 @media (max-width: 860px) {
   .site-header { height: 61px; padding: 0 17px; }.site-header nav { display: none; }.wordmark { font-size: 9px; }.wordmark em { font-size: 13px; }.project-trigger { min-height: 31px; font-size: 8px; padding-left: 9px; gap: 9px; }.project-trigger b { width: 23px; height: 23px; min-width: 23px; }
   .hero { min-height: 740px; display: block; }.hero-copy { position: relative; z-index: 3; padding: 113px 24px 43px; }.hero h1 { font-size: clamp(59px, 17.5vw, 100px); margin: 21px 0 29px; }.hero-statement { font-size: 21px; }.hero-note { margin-top: 29px; }.hero-art { position: absolute; inset: 0; min-height: 0; opacity: .48; }.hero-art::after { background: linear-gradient(90deg, var(--ink) 0%, rgba(16,16,16,.77) 56%, rgba(16,16,16,.22) 100%); }.hero-number { top: 82px; right: 8px; font-size: 190px; }.hero-cover { width: 180px; }.cover-back { top: 129px; right: -28px; }.cover-front { top: 281px; left: auto; right: 38px; }.hero-caption { display: none; }
-  .manifesto { padding: 80px 24px; }.manifesto-grid { grid-template-columns: 1fr; gap: 48px; }.manifesto h2, .magazine h2 { font-size: clamp(47px, 13.5vw, 75px); }.manifesto-steps p { font-size: 17px; } .statement { padding: 72px 24px 64px; }.statement-line { font-size: clamp(19px, 6.4vw, 26px); }.flow-chain { margin-top: 38px; gap: 6px; }.feature-section { grid-template-columns: 1fr; min-height: 0; }.feature-visual { min-height: 290px; order: -1; }.feature-body { padding: 52px 24px 58px; }.timeline-section { padding: 62px 24px 70px; }.timeline-preview { grid-template-columns: 1fr; gap: 20px; }.closing-cta .closing-note { font-size: 17px; }
+  .manifesto { padding: 80px 24px; }.manifesto-grid { grid-template-columns: 1fr; gap: 48px; }.manifesto h2, .magazine h2 { font-size: clamp(47px, 13.5vw, 75px); }.manifesto-steps p { font-size: 17px; } .statement { padding: 72px 24px 64px; }.statement-line { font-size: clamp(19px, 6.4vw, 26px); }.flow-chain { margin-top: 38px; gap: 6px; }.feature-section { grid-template-columns: 1fr; min-height: 0; }.feature-visual { min-height: 290px; order: -1; }.feature-body { padding: 52px 24px 58px; }.timeline-section { padding: 62px 24px 70px; }.timeline-preview { grid-template-columns: 1fr; gap: 20px; }
   .magazine { padding: 70px 17px 87px; }.magazine-head { margin-bottom: 36px; }.issue-counter { width: 105px; }.issue-counter span { display: none; }.filter-bar { grid-template-columns: 1fr; min-height: auto; }.search-field { height: 54px; border-right: 0; padding: 0 3px; border-bottom: 1px solid var(--line); }.filter-scroll { height: 48px; padding: 10px 0; }.cover-count-line { margin: 14px 0 23px; }.cover-count-line span:last-child { display: none; }.cover-shelf { grid-template-columns: repeat(2, 1fr); gap: 12px; }.mag-cover { margin-top: 0; }.cover-2, .cover-4, .cover-6 { margin-top: 36px; }.cover-content h3 { font-size: clamp(28px, 8.7vw, 49px); }.next-edition { margin-top: 80px; grid-template-columns: 1fr; gap: 15px; }.next-edition button { justify-self: start; }
   .closing-cta { min-height: 555px; grid-template-columns: 1fr; position: relative; }.closing-image { min-height: 0; position: absolute; inset: 0; opacity: .22; }.closing-cta > div:last-child { position: relative; padding: 74px 24px; }.closing-cta h2 { font-size: clamp(46px, 13.5vw, 75px); } footer { grid-template-columns: 1fr; padding: 31px 24px; gap: 17px; } footer > span { text-align: left; }
   .overlay { padding: 0; }.subject-sheet { width: 100%; height: 100%; max-height: 100vh; display: block; }.subject-visual { min-height: 390px; position: relative; }.subject-story { padding: 30px 24px 34px; }.subject-lede { font-size: 25px; }.subject-visual h2 { font-size: 65px; }.sheet-columns { gap: 15px; }.close-sheet { top: 14px; right: 14px; }

@@ -654,7 +654,6 @@ export default function HomePage() {
   }, [selectedSubjects]);
 
   const scrollToMagazine = () => document.getElementById("magazine")?.scrollIntoView({ behavior: "smooth" });
-  const scrollToMethod = () => document.getElementById("method")?.scrollIntoView({ behavior: "smooth" });
 
   return (
     <main>
@@ -676,12 +675,11 @@ export default function HomePage() {
         <div className="hero-copy">
           <p className="edition-label">ÉDITION MONDE · 2025—2026</p>
           <h1 id="hero-title">VOTRE MARIAGE<br /><i>COMMENCE PAR</i><br />UNE HISTOIRE.</h1>
-          <p className="hero-statement">Feuilletez. Inspirez-vous. Choisissez ce qui vous ressemble.</p>
+          <p className="hero-statement">Vous feuillettez. Vous choisissez. WEDMAG structure.</p>
           <div className="hero-actions">
             <button className="button button-fuchsia" onClick={scrollToMagazine}>COMMENCER À FEUILLETER <span>↓</span></button>
-            <button className="button button-ghost" onClick={scrollToMethod}>VOIR COMMENT ÇA MARCHE</button>
           </div>
-          <p className="hero-note">WEDMAG transforme progressivement vos choix<br />en un dossier vivant pour votre mariage.</p>
+          <p className="hero-note">Votre magazine devient votre dossier de mariage.</p>
         </div>
 
         <div className="hero-art" aria-label="Sélection de couvertures du magazine">
@@ -695,21 +693,17 @@ export default function HomePage() {
             <div className="cover-front-title"><span>THE</span><strong>SAXOPHONISTE</strong><i>issue</i></div>
             <p>Le détail qui change l’air.</p>
           </article>
-          <p className="hero-caption">VOUS FEUILLETEZ. VOUS CHOISISSEZ.<br />WEDMAG STRUCTURE.</p>
         </div>
       </section>
 
       <section className="manifesto" id="method">
         <p className="section-kicker">COMMENT ÇA MARCHE ?</p>
-        <div className="manifesto-grid">
-          <h2>Votre magazine<br /><i>devient votre</i><br />dossier de mariage.</h2>
-          <div className="manifesto-steps concept-steps">
-            <div><span>01</span><div><b>FEUILLETEZ</b><p>Découvrez votre mariage autrement. Lieux, métiers, savoir-faire, inspirations, expériences et idées à travers le magazine.</p></div></div>
-            <div><span>02</span><div><b>CHOISISSEZ</b><p>Une idée vous plaît ? Gardez-la. Lorsque vous ajoutez quelque chose à votre mariage, WEDMAG commence à construire votre dossier.</p></div></div>
-            <div><span>03</span><div><b>VOTRE DOSSIER</b><p>Chaque choix trouve sa place. Vos inspirations deviennent progressivement des dossiers liés à votre mariage.</p></div></div>
-            <div><span>04</span><div><b>VOTRE PARCOURS</b><p>WEDMAG vous montre naturellement ce qui vient ensuite. Chaque dossier possède son propre parcours, construit à partir du sujet choisi.</p></div></div>
-            <div><span>05</span><div><b>CE QUI S’EST PASSÉ</b><p>Gardez la trace de vos décisions. Déclarez ce qui s’est réellement passé avec les personnes liées à votre mariage : sélection, contact, confirmation.</p><em>Chaque déclaration est celle du couple — WEDMAG ne vérifie rien, il en garde la trace.</em></div></div>
-          </div>
+        <div className="manifesto-steps concept-steps">
+          <div><span>01</span><div><b>FEUILLETEZ</b><p>Lieux, métiers, savoir-faire, idées — le magazine de votre mariage.</p></div></div>
+          <div><span>02</span><div><b>CHOISISSEZ</b><p>Gardez ce qui vous ressemble : votre dossier commence.</p></div></div>
+          <div><span>03</span><div><b>VOTRE DOSSIER</b><p>Chaque choix trouve sa place.</p></div></div>
+          <div><span>04</span><div><b>VOTRE PARCOURS</b><p>Ce qui vient ensuite, déduit de votre choix.</p></div></div>
+          <div><span>05</span><div><b>CE QUI S’EST PASSÉ</b><p>Ce que vous déclarez : sélection, contact, confirmation.</p></div></div>
         </div>
       </section>
 
@@ -726,23 +720,16 @@ export default function HomePage() {
       <section className="feature-section" aria-labelledby="dossier-title">
         <div className="feature-visual" style={{ backgroundImage: "url(/covers/002-chateau.jpg)" }} aria-hidden="true" />
         <div className="feature-body">
-          <p className="section-kicker">LE DOSSIER VIVANT</p>
           <h2 id="dossier-title">LE MAGAZINE DEVIENT<br /><i>votre dossier.</i></h2>
-          <p className="feature-text">Pas de catalogue à remplir. Pas de tableau de gestion à comprendre. Vous partez de ce qui vous inspire, puis WEDMAG organise progressivement ce que vous avez choisi.</p>
-          <ul className="feature-list">
-            <li><b>SUJET</b><span>La couverture choisie reste l’identité de votre dossier.</span></li>
-            <li><b>ÉTAT</b><span>Inspiration, sélection, contact — là où en est votre choix.</span></li>
-            <li><b>PARCOURS</b><span>Les prochaines étapes, déduites du sujet choisi.</span></li>
-            <li><b>PERSONNES</b><span>Celles et ceux que vous rencontrez, et ce que vous déclarez.</span></li>
-            <li><b>CHRONOLOGIE</b><span>Le moment de votre journée où chaque choix s’inscrit.</span></li>
+          <p className="feature-text">Pas de catalogue à remplir. Vous choisissez — WEDMAG organise.</p>
+          <ul className="feature-tags" aria-label="Ce que contient un dossier">
+            <li>SUJET</li><li>ÉTAT</li><li>PARCOURS</li><li>PERSONNES</li><li>CHRONOLOGIE</li>
           </ul>
         </div>
       </section>
 
       <section className="timeline-section" aria-labelledby="timeline-title">
-        <div className="section-kicker">LA TIMELINE</div>
         <h2 id="timeline-title">TOUT RESTE <i>lié.</i></h2>
-        <p className="feature-text timeline-text">Votre mariage évolue dans le temps. La Timeline rassemble ce que vous avez choisi et relie chaque dossier au moment de votre journée où il prendra sa place.</p>
         <div className="timeline-preview">
           {weddingPhases.map((phase) => (
             <div key={phase.key}>
@@ -818,7 +805,6 @@ export default function HomePage() {
         <div className="closing-image" style={{ backgroundImage: `url(${images[3]})` }} />
         <div>
           <h2>COMMENCEZ PAR<br /><i>feuilleter.</i></h2>
-          <p className="closing-note">Votre mariage n’a pas besoin d’être organisé avant de commencer.<br />Commencez par découvrir ce qui vous ressemble.</p>
           <button className="button button-light" onClick={scrollToMagazine}>ENTRER DANS WEDMAG <span>↓</span></button>
         </div>
       </section>
