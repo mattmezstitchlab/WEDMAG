@@ -28,11 +28,11 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .project-trigger b { min-width: 26px; height: 26px; display: grid; place-items: center; color: var(--hot); background: white; font-size: 12px; letter-spacing: 0; }
 
 .hero { min-height: 786px; background: var(--ink); color: white; display: grid; grid-template-columns: .96fr 1.04fr; overflow: hidden; position: relative; }
-.hero-copy { align-self: end; padding: 133px 4vw 82px 7.6vw; position: relative; z-index: 2; }
+.hero-copy { align-self: end; padding: 140px 4vw 98px 7.6vw; position: relative; z-index: 2; }
 .edition-label, .section-kicker { margin: 0; font-size: 10px; letter-spacing: .17em; font-weight: 800; text-transform: uppercase; }
-.hero h1 { font-size: clamp(66px, 7.7vw, 134px); line-height: .745; letter-spacing: -.092em; margin: 28px 0 36px; font-weight: 900; }
+.hero h1 { font-size: clamp(58px, 6.8vw, 116px); line-height: .8; letter-spacing: -.092em; margin: 30px 0 40px; font-weight: 900; }
 h1 i, h2 i { font-family: Georgia, "Times New Roman", serif; font-weight: 400; letter-spacing: -.09em; }
-.hero-statement { font-family: Georgia, "Times New Roman", serif; font-size: 23px; line-height: 1.1; max-width: 300px; margin: 0 0 32px; }
+.hero-statement { font-family: Georgia, "Times New Roman", serif; font-size: 23px; line-height: 1.15; max-width: 380px; margin: 0 0 40px; }
 .hero-actions { display: flex; align-items: center; gap: 11px; flex-wrap: wrap; }
 .button { min-height: 46px; border: 1px solid transparent; padding: 0 16px; display: inline-flex; align-items: center; justify-content: center; gap: 17px; font-size: 10px; letter-spacing: .11em; font-weight: 800; transition: transform .2s ease, background .2s ease; }
 .button:hover { transform: translateY(-2px); }
@@ -40,7 +40,6 @@ h1 i, h2 i { font-family: Georgia, "Times New Roman", serif; font-weight: 400; l
 .button-fuchsia span { font-size: 17px; line-height: 0; }
 .button-ghost { background: transparent; color: white; border-color: rgba(255,255,255,.65); }
 .button-ghost span, .button-light span { border-radius: 50%; background: currentColor; color: var(--ink); height: 19px; min-width: 19px; display: grid; place-items: center; font-size: 10px; }
-.hero-note { font-size: 10px; line-height: 1.55; letter-spacing: .11em; margin: 52px 0 0; color: rgba(255,255,255,.66); font-weight: 700; }
 .hero-art { position: relative; overflow: hidden; min-height: 786px; }
 .hero-art::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, var(--ink) 0%, transparent 22%, rgba(0,0,0,.2) 100%); pointer-events: none; }
 .hero-number { font-family: Georgia, "Times New Roman", serif; position: absolute; top: 100px; right: 5vw; font-size: clamp(160px, 23vw, 370px); line-height: .75; letter-spacing: -.13em; color: rgba(255,255,255,.1); z-index: 1; }
@@ -233,7 +232,7 @@ footer { min-height: 160px; background: var(--ink); color: white; padding: 38px 
 
 @media (max-width: 860px) {
   .site-header { height: 61px; padding: 0 17px; }.site-header nav { display: none; }.wordmark { font-size: 9px; }.wordmark em { font-size: 13px; }.project-trigger { min-height: 31px; font-size: 8px; padding-left: 9px; gap: 9px; }.project-trigger b { width: 23px; height: 23px; min-width: 23px; }
-  .hero { min-height: 740px; display: block; }.hero-copy { position: relative; z-index: 3; padding: 113px 24px 43px; }.hero h1 { font-size: clamp(59px, 17.5vw, 100px); margin: 21px 0 29px; }.hero-statement { font-size: 21px; }.hero-note { margin-top: 29px; }.hero-art { position: absolute; inset: 0; min-height: 0; opacity: .48; }.hero-art::after { background: linear-gradient(90deg, var(--ink) 0%, rgba(16,16,16,.77) 56%, rgba(16,16,16,.22) 100%); }.hero-number { top: 82px; right: 8px; font-size: 190px; }.hero-cover { width: 180px; }.cover-back { top: 129px; right: -28px; }.cover-front { top: 281px; left: auto; right: 38px; }.hero-caption { display: none; }
+  .hero { min-height: 740px; display: block; }.hero-copy { position: relative; z-index: 3; padding: 113px 24px 66px; }.hero h1 { font-size: clamp(59px, 17.5vw, 100px); margin: 21px 0 29px; }.hero-statement { font-size: 21px; }.hero-art { position: absolute; inset: 0; min-height: 0; opacity: .78; }.hero-art::after { background: linear-gradient(90deg, var(--ink) 0%, rgba(16,16,16,.77) 56%, rgba(16,16,16,.22) 100%); }.hero-number { top: 82px; right: 8px; font-size: 190px; }.hero-cover { width: 180px; }.cover-back { top: 129px; right: -28px; }.cover-front { top: 281px; left: auto; right: 38px; }.hero-caption { display: none; }
   .manifesto { padding: 80px 24px; }.manifesto-grid { grid-template-columns: 1fr; gap: 48px; }.manifesto h2, .magazine h2 { font-size: clamp(47px, 13.5vw, 75px); }.manifesto-steps p { font-size: 17px; } .statement { padding: 72px 24px 64px; }.statement-line { font-size: clamp(19px, 6.4vw, 26px); }.flow-chain { margin-top: 38px; gap: 6px; }.feature-section { grid-template-columns: 1fr; min-height: 0; }.feature-visual { min-height: 290px; order: -1; }.feature-body { padding: 52px 24px 58px; }.timeline-section { padding: 62px 24px 70px; }.timeline-preview { grid-template-columns: 1fr; gap: 20px; }
   .magazine { padding: 70px 17px 87px; }.magazine-head { margin-bottom: 36px; }.issue-counter { width: 105px; }.issue-counter span { display: none; }.filter-bar { grid-template-columns: 1fr; min-height: auto; }.search-field { height: 54px; border-right: 0; padding: 0 3px; border-bottom: 1px solid var(--line); }.filter-scroll { height: 48px; padding: 10px 0; }.cover-count-line { margin: 14px 0 23px; }.cover-count-line span:last-child { display: none; }.cover-shelf { grid-template-columns: repeat(2, 1fr); gap: 12px; }.mag-cover { margin-top: 0; }.cover-2, .cover-4, .cover-6 { margin-top: 36px; }.cover-content h3 { font-size: clamp(28px, 8.7vw, 49px); }.next-edition { margin-top: 80px; grid-template-columns: 1fr; gap: 15px; }.next-edition button { justify-self: start; }
   .closing-cta { min-height: 555px; grid-template-columns: 1fr; position: relative; }.closing-image { min-height: 0; position: absolute; inset: 0; opacity: .22; }.closing-cta > div:last-child { position: relative; padding: 74px 24px; }.closing-cta h2 { font-size: clamp(46px, 13.5vw, 75px); } footer { grid-template-columns: 1fr; padding: 31px 24px; gap: 17px; } footer > span { text-align: left; }

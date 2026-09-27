@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   getSubject,
-  images,
   plannedCoverCount,
   publishedCoverCount,
   subjects,
@@ -679,65 +678,20 @@ export default function HomePage() {
           <div className="hero-actions">
             <button className="button button-fuchsia" onClick={scrollToMagazine}>COMMENCER À FEUILLETER <span>↓</span></button>
           </div>
-          <p className="hero-note">Votre magazine devient votre dossier de mariage.</p>
         </div>
 
         <div className="hero-art" aria-label="Sélection de couvertures du magazine">
           <div className="hero-number">365</div>
-          <article className="hero-cover cover-back" style={{ backgroundImage: `url(${images[4]})` }}>
-            <CoverMark number={35} light />
-            <strong>MARIAGE<br />À LA PLAGE</strong>
+          <article className="hero-cover cover-back" style={{ backgroundImage: "url(/covers/006-ceremonie-laique.jpg)" }}>
+            <CoverMark number={6} light />
+            <strong>CÉRÉMONIE<br />LAÏQUE</strong>
           </article>
-          <article className="hero-cover cover-front" style={{ backgroundImage: `url(${images[0]})` }}>
+          <article className="hero-cover cover-front" style={{ backgroundImage: "url(/covers/001-saxophoniste.jpg)" }}>
             <CoverMark number={1} light />
             <div className="cover-front-title"><span>THE</span><strong>SAXOPHONISTE</strong><i>issue</i></div>
             <p>Le détail qui change l’air.</p>
           </article>
-        </div>
-      </section>
-
-      <section className="manifesto" id="method">
-        <p className="section-kicker">COMMENT ÇA MARCHE ?</p>
-        <div className="manifesto-steps concept-steps">
-          <div><span>01</span><div><b>FEUILLETEZ</b><p>Lieux, métiers, savoir-faire, idées — le magazine de votre mariage.</p></div></div>
-          <div><span>02</span><div><b>CHOISISSEZ</b><p>Gardez ce qui vous ressemble : votre dossier commence.</p></div></div>
-          <div><span>03</span><div><b>VOTRE DOSSIER</b><p>Chaque choix trouve sa place.</p></div></div>
-          <div><span>04</span><div><b>VOTRE PARCOURS</b><p>Ce qui vient ensuite, déduit de votre choix.</p></div></div>
-          <div><span>05</span><div><b>CE QUI S’EST PASSÉ</b><p>Ce que vous déclarez : sélection, contact, confirmation.</p></div></div>
-        </div>
-      </section>
-
-      <section className="statement" aria-label="Le fil WEDMAG">
-        <p className="statement-line">CE QUE VOUS DÉCOUVREZ DANS LE MAGAZINE<br />PEUT DEVENIR CE QUE VOUS VIVEZ DANS VOTRE MARIAGE.</p>
-        <div className="flow-chain" aria-hidden="true">
-          <span>MAGAZINE</span><i>↓</i>
-          <span>MON MARIAGE</span><i>↓</i>
-          <span>MON DOSSIER</span><i>↓</i>
-          <span>MON PARCOURS</span>
-        </div>
-      </section>
-
-      <section className="feature-section" aria-labelledby="dossier-title">
-        <div className="feature-visual" style={{ backgroundImage: "url(/covers/002-chateau.jpg)" }} aria-hidden="true" />
-        <div className="feature-body">
-          <h2 id="dossier-title">LE MAGAZINE DEVIENT<br /><i>votre dossier.</i></h2>
-          <p className="feature-text">Pas de catalogue à remplir. Vous choisissez — WEDMAG organise.</p>
-          <ul className="feature-tags" aria-label="Ce que contient un dossier">
-            <li>SUJET</li><li>ÉTAT</li><li>PARCOURS</li><li>PERSONNES</li><li>CHRONOLOGIE</li>
-          </ul>
-        </div>
-      </section>
-
-      <section className="timeline-section" aria-labelledby="timeline-title">
-        <h2 id="timeline-title">TOUT RESTE <i>lié.</i></h2>
-        <div className="timeline-preview">
-          {weddingPhases.map((phase) => (
-            <div key={phase.key}>
-              <b>{phase.number}</b>
-              <h3>{phase.label}</h3>
-              <span>{phase.moments.join(" · ")}</span>
-            </div>
-          ))}
+          <p className="hero-caption">DES IDÉES À FEUILLETER.<br />DES CHOIX À RELIER.</p>
         </div>
       </section>
 
@@ -801,8 +755,56 @@ export default function HomePage() {
         </div>
       </section>
 
+      <section className="manifesto" id="method">
+        <p className="section-kicker">COMMENT ÇA MARCHE ?</p>
+        <div className="manifesto-grid">
+          <h2>Votre magazine<br /><i>devient votre</i><br />dossier de mariage.</h2>
+          <div className="manifesto-steps concept-steps">
+          <div><span>01</span><div><b>FEUILLETEZ</b><p>Lieux, métiers, savoir-faire, idées — le magazine de votre mariage.</p></div></div>
+          <div><span>02</span><div><b>CHOISISSEZ</b><p>Gardez ce qui vous ressemble : votre dossier commence.</p></div></div>
+          <div><span>03</span><div><b>VOTRE DOSSIER</b><p>Chaque choix trouve sa place.</p></div></div>
+          <div><span>04</span><div><b>VOTRE PARCOURS</b><p>Ce qui vient ensuite, déduit de votre choix.</p></div></div>
+          <div><span>05</span><div><b>CE QUI S’EST PASSÉ</b><p>Ce que vous déclarez : sélection, contact, confirmation.</p></div></div>
+          </div>
+        </div>
+      </section>
+
+      <section className="statement" aria-label="Le fil WEDMAG">
+        <p className="statement-line">CE QUE VOUS DÉCOUVREZ DANS LE MAGAZINE<br />PEUT DEVENIR CE QUE VOUS VIVEZ DANS VOTRE MARIAGE.</p>
+        <div className="flow-chain" aria-hidden="true">
+          <span>MAGAZINE</span><i>↓</i>
+          <span>MON MARIAGE</span><i>↓</i>
+          <span>MON DOSSIER</span><i>↓</i>
+          <span>MON PARCOURS</span>
+        </div>
+      </section>
+
+      <section className="feature-section" aria-labelledby="dossier-title">
+        <div className="feature-visual" style={{ backgroundImage: "url(/covers/002-chateau.jpg)" }} aria-hidden="true" />
+        <div className="feature-body">
+          <h2 id="dossier-title">LE MAGAZINE DEVIENT<br /><i>votre dossier.</i></h2>
+          <p className="feature-text">Pas de catalogue à remplir. Vous choisissez — WEDMAG organise.</p>
+          <ul className="feature-tags" aria-label="Ce que contient un dossier">
+            <li>SUJET</li><li>ÉTAT</li><li>PARCOURS</li><li>PERSONNES</li><li>CHRONOLOGIE</li>
+          </ul>
+        </div>
+      </section>
+
+      <section className="timeline-section" aria-labelledby="timeline-title">
+        <h2 id="timeline-title">TOUT RESTE <i>lié.</i></h2>
+        <div className="timeline-preview">
+          {weddingPhases.map((phase) => (
+            <div key={phase.key}>
+              <b>{phase.number}</b>
+              <h3>{phase.label}</h3>
+              <span>{phase.moments.join(" · ")}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
       <section className="closing-cta">
-        <div className="closing-image" style={{ backgroundImage: `url(${images[3]})` }} />
+        <div className="closing-image" style={{ backgroundImage: "url(/covers/010-scenographie.jpg)" }} />
         <div>
           <h2>COMMENCEZ PAR<br /><i>feuilleter.</i></h2>
           <button className="button button-light" onClick={scrollToMagazine}>ENTRER DANS WEDMAG <span>↓</span></button>
