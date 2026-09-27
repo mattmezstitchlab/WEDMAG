@@ -124,7 +124,9 @@ export async function POST(request: Request) {
           .values({ projectId: project.id, subjectId: action.subjectId, state: "selection", source: "wedmag" })
           .onConflictDoNothing();
       } else if (action.action === "set-state") {
-        await db
+        // returning() tells us whether the dossier actually existed — a
+        // set-state on a subject with no dossier must not answer ok:true.
+        const updated = await db
           .update(weddingDossiers)
           .set({ state: action.state, updatedAt: sql`now()` })
           .where(
@@ -132,7 +134,12 @@ export async function POST(request: Request) {
               eq(weddingDossiers.projectId, project.id),
               eq(weddingDossiers.subjectId, action.subjectId),
             ),
-          );
+          )
+          .returning({ id: weddingDossiers.id });
+
+        if (updated.length === 0) {
+          return NextResponse.json({ error: "No dossier for this subject" }, { status: 400 });
+        }
       } else {
         await db
           .delete(weddingDossiers)

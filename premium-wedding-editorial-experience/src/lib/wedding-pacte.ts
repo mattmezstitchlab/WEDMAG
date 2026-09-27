@@ -57,12 +57,26 @@ export type WeddingDossier = {
   subjectId: string;
   state: DossierState;
   source: string;
+  /**
+   * The dossier's stable identity (server uuid). Null only while persistence
+   * is local (local_only): the dossier exists, the browser just owns it
+   * alone. This id is the business anchor every future layer (prestataire,
+   * contrat, documents, paiements) will reference.
+   */
+  id: string | null;
+};
+
+/** One dossier entry in the client wedding state. */
+export type WeddingDossierEntry = {
+  id: string | null;
+  state: DossierState;
+  source: string;
 };
 
 /** Client shape of the wedding project (server rows flattened to a map). */
 export type WeddingProjectState = {
   name: string;
-  dossiers: Record<string, { state: DossierState; source: string }>;
+  dossiers: Record<string, WeddingDossierEntry>;
 };
 
 /**
@@ -84,10 +98,11 @@ export function normalizeWeddingState(value: unknown): WeddingProjectState | nul
 
   const normalized: WeddingProjectState = { name, dossiers: {} };
 
-  const fill = (entries: Record<string, { state?: unknown; source?: unknown }> | null | undefined) => {
+  const fill = (entries: Record<string, { id?: unknown; state?: unknown; source?: unknown }> | null | undefined) => {
     if (typeof entries !== "object" || entries === null) return;
     for (const [subjectId, entry] of Object.entries(entries)) {
       normalized.dossiers[subjectId] = {
+        id: typeof entry?.id === "string" && entry.id.length > 0 ? entry.id : null,
         state: isDossierState(entry?.state) ? entry.state : "selection",
         source: typeof entry?.source === "string" ? entry.source : "wedmag",
       };
@@ -218,8 +233,16 @@ export function mergeRestoredWedding(
   if (!current) return base;
   if (!base) return current;
 
+  // Per-entry merge: an in-flight local action wins on its entry (state,
+  // source), but the server uuid is preserved when the local action has
+  // none — the dossier's stable identity must survive the restore.
+  const dossiers: WeddingProjectState["dossiers"] = { ...base.dossiers };
+  for (const [subjectId, entry] of Object.entries(current.dossiers)) {
+    dossiers[subjectId] = { ...entry, id: entry.id ?? base.dossiers[subjectId]?.id ?? null };
+  }
+
   return {
     name: current.name || base.name,
-    dossiers: { ...base.dossiers, ...current.dossiers },
+    dossiers,
   };
 }

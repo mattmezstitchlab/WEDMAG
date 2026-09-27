@@ -149,7 +149,7 @@ export default function HomePage() {
         const response = await fetch("/api/wedding/project");
         if (response.ok) {
           const payload = (await response.json()) as {
-            project?: { name: string; dossiers: { subjectId: string; state: string; source: string }[] } | null;
+            project?: { name: string; dossiers: { id: string; subjectId: string; state: string; source: string }[] } | null;
             persistence?: string;
           };
           weddingPersistence = payload.persistence;
@@ -159,7 +159,11 @@ export default function HomePage() {
               dossiers: Object.fromEntries(
                 payload.project.dossiers.map((dossier) => [
                   dossier.subjectId,
-                  { state: dossier.state as DossierState, source: dossier.source },
+                  {
+                    id: typeof dossier.id === "string" ? dossier.id : null,
+                    state: dossier.state as DossierState,
+                    source: dossier.source,
+                  },
                 ]),
               ),
             };
@@ -247,7 +251,7 @@ export default function HomePage() {
     if (wedding && !wedding.dossiers[subject.id]) {
       setWedding((current) =>
         current
-          ? { ...current, dossiers: { ...current.dossiers, [subject.id]: { state: "selection", source: "wedmag" } } }
+          ? { ...current, dossiers: { ...current.dossiers, [subject.id]: { id: null, state: "selection", source: "wedmag" } } }
           : current,
       );
       syncWedding({ action: "attach", subjectId: subject.id });
@@ -298,7 +302,7 @@ export default function HomePage() {
     const label = getSubject(subjectId)?.title ?? "Cette inspiration";
     setWedding((current) =>
       current
-        ? { ...current, dossiers: { ...current.dossiers, [subjectId]: { state: "selection", source: "wedmag" } } }
+        ? { ...current, dossiers: { ...current.dossiers, [subjectId]: { id: null, state: "selection", source: "wedmag" } } }
         : current,
     );
     syncWedding({ action: "attach", subjectId });
@@ -560,9 +564,15 @@ export default function HomePage() {
                 })}
               </div></div>
               <div className="professional-line"><span>À DÉCOUVRIR AUSSI</span><p>{activeSubject.professionals[0].name} <em>— {activeSubject.professionals[0].role}, {activeSubject.professionals[0].city}</em></p></div>
-              <button className={`add-wide ${project[activeSubject.id] ? "added" : ""}`} onClick={() => addSubject(activeSubject)}>
-                {project[activeSubject.id] ? "✓ DANS MON MARIAGE — VOIR LE PROJET" : "+ AJOUTER À MON MARIAGE"}
-              </button>
+              {wedding?.dossiers[activeSubject.id] ? (
+                <button className="add-wide added" onClick={() => { setActiveDossier(activeSubject); setActiveSubject(null); }}>
+                  ✓ DANS MON MARIAGE — OUVRIR LE DOSSIER
+                </button>
+              ) : (
+                <button className="add-wide" onClick={() => addSubject(activeSubject)}>
+                  + AJOUTER À MON MARIAGE
+                </button>
+              )}
             </div>
           </article>
         </div>
@@ -607,7 +617,7 @@ export default function HomePage() {
                             {group.subjects.map((subject) => {
                               const dossier = wedding.dossiers[subject.id];
                               return (
-                                <article className="project-item" key={subject.id}>
+                                <article className="project-item" key={dossier?.id ?? subject.id}>
                                   <button className="project-thumb" style={{ backgroundImage: `url(${subject.image})` }} onClick={() => { setActiveDossier(subject); setDrawerOpen(false); }} aria-label={`Ouvrir le dossier ${subject.title}`} />
                                   <div className="project-item-main">
                                     <button onClick={() => { setActiveDossier(subject); setDrawerOpen(false); }}>{subject.title}</button>
@@ -755,8 +765,20 @@ export default function HomePage() {
               </div>
             </div>
             <div className="subject-story">
-              <div className="dossier-state-line">
-                <span className="block-title">ÉTAT DU DOSSIER</span>
+              <div className="dossier-topline">
+                <span>{activeDossier.universe.toUpperCase()} · {activeDossier.category.toUpperCase()}</span>
+                <b>{dossierStateLabels[wedding.dossiers[activeDossier.id]?.state ?? "selection"].toUpperCase()}</b>
+              </div>
+              <p className="subject-lede">{activeDossier.intro}</p>
+              <p className="subject-description">{activeDossier.description}</p>
+
+              <div className="editorial-block">
+                <p className="block-title">CHRONOLOGIE</p>
+                <div className="tag-list">{activeDossier.moments.map((moment) => <span key={moment}>{moment}</span>)}</div>
+              </div>
+
+              <div className="editorial-block dossier-state-line">
+                <p className="block-title">ÉTAT DU DOSSIER</p>
                 <div className="dossier-state-controls">
                   {settableDossierStates.map((state) => (
                     <button
@@ -770,22 +792,14 @@ export default function HomePage() {
                   ))}
                 </div>
               </div>
-              <p className="subject-lede">{activeDossier.intro}</p>
-              <p className="subject-description">{activeDossier.description}</p>
 
-              <div className="editorial-block">
-                <p className="block-title">DANS LE FIL DE VOTRE JOURNÉE</p>
-                <div className="tag-list">{activeDossier.moments.map((moment) => <span key={moment}>{moment}</span>)}</div>
-              </div>
-              <div className="sheet-columns">
-                <div className="editorial-block"><p className="block-title">CE QU’IL FAUDRA ORGANISER</p><ul>{activeDossier.toPlan.map((item) => <li key={item}>{item}</li>)}</ul></div>
-                <div className="editorial-block"><p className="block-title">À GARDER EN TÊTE</p><ul>{activeDossier.constraints.map((item) => <li key={item}>{item}</li>)}</ul></div>
-              </div>
+              <p className="dossier-next">Ce dossier pourra bientôt accueillir votre prestataire, votre contrat, vos documents et vos échéances — chaque couche n’arrivera que lorsqu’elle sera réellement nécessaire.</p>
 
-              <p className="dossier-next">La suite du dossier — prestataire, proposition, contrat, documents, paiements, échéances — s’ouvrira ici, étape après étape.</p>
-
-              <button className="add-wide" onClick={() => { detachSubject(activeDossier.id); setActiveDossier(null); }}>
-                RETIRER CE DOSSIER DE MON MARIAGE
+              <button className="add-wide" onClick={() => { setActiveSubject(activeDossier); setActiveDossier(null); }}>
+                REVOIR LA COUVERTURE
+              </button>
+              <button className="dossier-remove" onClick={() => { detachSubject(activeDossier.id); setActiveDossier(null); }}>
+                Retirer ce dossier de mon mariage
               </button>
             </div>
           </article>

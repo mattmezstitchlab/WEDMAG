@@ -18,6 +18,7 @@ const dossier = (subjectId: string, state: WeddingDossier["state"] = "selection"
   subjectId,
   state,
   source: "wedmag",
+  id: null,
 });
 const project = (
   name: string,
@@ -115,56 +116,64 @@ test("a subject is never duplicated on the timeline (dedup by subject)", () => {
 
 // --- mergeRestoredWedding: restore rule for the wedding project ---
 
+const entry = (id: string | null, state: "selection" | "inspiration" = "selection") => ({
+  id,
+  state,
+  source: "wedmag",
+});
+
 test("keeps the local project when persistence is local_only", () => {
   const merged = mergeRestoredWedding(
-    { persistence: "local_only", project: project("Serveur", { dj: { state: "selection", source: "wedmag" } }) },
-    project("Local", { traiteur: { state: "selection", source: "wedmag" } }),
+    { persistence: "local_only", project: project("Serveur", { dj: entry("uuid-dj") }) },
+    project("Local", { traiteur: entry(null) }),
     null,
   );
-  assert.deepEqual(merged, project("Local", { traiteur: { state: "selection", source: "wedmag" } }));
+  assert.deepEqual(merged, project("Local", { traiteur: entry(null) }));
 });
 
 test("keeps the local project when the API was unavailable (503)", () => {
   const merged = mergeRestoredWedding(
     { persistence: "unavailable", project: null },
-    project("Local", { dj: { state: "inspiration", source: "wedmag" } }),
+    project("Local", { dj: entry(null, "inspiration") }),
     null,
   );
-  assert.deepEqual(merged, project("Local", { dj: { state: "inspiration", source: "wedmag" } }));
+  assert.deepEqual(merged, project("Local", { dj: entry(null, "inspiration") }));
 });
 
 test("a non-null server project is authoritative", () => {
   const merged = mergeRestoredWedding(
-    { persistence: "server", project: project("Serveur", { dj: { state: "selection", source: "wedmag" } }) },
-    project("Local", { dj: { state: "inspiration", source: "wedmag" }, traiteur: { state: "selection", source: "wedmag" } }),
+    { persistence: "server", project: project("Serveur", { dj: entry("uuid-dj") }) },
+    project("Local", { dj: entry(null, "inspiration"), traiteur: entry(null) }),
     null,
   );
-  assert.deepEqual(merged, project("Serveur", { dj: { state: "selection", source: "wedmag" } }));
+  assert.deepEqual(merged, project("Serveur", { dj: entry("uuid-dj") }));
 });
 
 test("keeps the local project when the server has none", () => {
   const merged = mergeRestoredWedding(
     { persistence: "server", project: null },
-    project("Local", { dj: { state: "selection", source: "wedmag" } }),
+    project("Local", { dj: entry(null) }),
     null,
   );
-  assert.deepEqual(merged, project("Local", { dj: { state: "selection", source: "wedmag" } }));
+  assert.deepEqual(merged, project("Local", { dj: entry(null) }));
 });
 
-test("in-flight creation and dossiers win over the restore", () => {
+test("in-flight creation and dossiers win over the restore, keeping server ids", () => {
   const merged = mergeRestoredWedding(
-    { persistence: "server", project: project("Serveur", { dj: { state: "selection", source: "wedmag" } }) },
+    { persistence: "server", project: project("Serveur", { dj: entry("uuid-dj") }) },
     null,
     project("En cours", {
-      dj: { state: "inspiration", source: "wedmag" },
-      brunch: { state: "selection", source: "wedmag" },
+      dj: entry(null, "inspiration"),
+      brunch: entry(null),
     }),
   );
+  // The in-flight state wins, but the dossier keeps its server identity.
   assert.deepEqual(merged, project("En cours", {
-    dj: { state: "inspiration", source: "wedmag" },
-    brunch: { state: "selection", source: "wedmag" },
+    dj: entry("uuid-dj", "inspiration"),
+    brunch: entry(null),
   }));
 });
+
 
 test("returns null when nothing exists anywhere", () => {
   assert.equal(mergeRestoredWedding({ persistence: "local_only", project: null }, null, null), null);
@@ -197,8 +206,8 @@ test("upgrades the previous `items` shape into dossiers with default state", () 
     items: { dj: { source: "wedmag" }, traiteur: { source: "wedmag" } },
   });
   assert.deepEqual(upgraded, project("Mon mariage", {
-    dj: { state: "selection", source: "wedmag" },
-    traiteur: { state: "selection", source: "wedmag" },
+    dj: entry(null),
+    traiteur: entry(null),
   }));
 });
 
@@ -208,8 +217,8 @@ test("keeps the dossiers shape as-is and repairs invalid entries", () => {
     dossiers: { dj: { state: "contrat", source: "wedmag" }, plage: { state: "bogus", source: 42 } },
   });
   assert.deepEqual(normalized, project("Mon mariage", {
-    dj: { state: "contrat", source: "wedmag" },
-    plage: { state: "selection", source: "wedmag" },
+    dj: { id: null, state: "contrat", source: "wedmag" },
+    plage: entry(null),
   }));
 });
 
@@ -217,4 +226,62 @@ test("rejects shapes without a usable name", () => {
   for (const value of [null, {}, { name: "" }, { name: 42 }, { dossiers: {} }, "wedding"]) {
     assert.equal(normalizeWeddingState(value), null, `${JSON.stringify(value)} must normalize to null`);
   }
+});
+
+// --- Phase 1.1: the dossier's stable identity (uuid) ---
+
+test("an in-flight entry without id inherits the server uuid", () => {
+  const merged = mergeRestoredWedding(
+    { persistence: "server", project: project("Serveur", { dj: entry("server-uuid") }) },
+    null,
+    project("En cours", { dj: entry(null, "inspiration") }),
+  );
+  assert.deepEqual(merged, project("En cours", { dj: entry("server-uuid", "inspiration") }));
+});
+
+test("normalizeWeddingState keeps a valid dossier id and nulls an invalid one", () => {
+  const normalized = normalizeWeddingState({
+    name: "Mon mariage",
+    dossiers: {
+      dj: { id: "6abb1bdd-2c77-4784-ae32-baf010007961", state: "selection", source: "wedmag" },
+      traiteur: { id: 42, state: "selection", source: "wedmag" },
+      plage: { id: "", state: "inspiration", source: "wedmag" },
+    },
+  });
+  assert.deepEqual(normalized, project("Mon mariage", {
+    dj: entry("6abb1bdd-2c77-4784-ae32-baf010007961"),
+    traiteur: entry(null),
+    plage: entry(null, "inspiration"),
+  }));
+});
+
+test("upgrading the previous items shape yields dossiers without server id", () => {
+  const upgraded = normalizeWeddingState({
+    name: "Mon mariage",
+    items: { dj: { source: "wedmag" } },
+  });
+  assert.deepEqual(upgraded, project("Mon mariage", { dj: entry(null) }));
+});
+
+// --- §17: subject/dossier and wedding/dossier relations ---
+
+test("a dossier references its catalogue subject and inherits its timeline place", () => {
+  const saxo: WeddingDossier = { subjectId: "saxophoniste", state: "selection", source: "wedmag", id: "uuid-1" };
+  const timeline = buildProjectTimeline([saxo]);
+  const jour = timeline.find((phase) => phase.key === "jour");
+  assert.ok(jour);
+  assert.deepEqual(jour.momentGroups[0].subjects.map((s) => s.id), ["saxophoniste"]);
+});
+
+test("a dossier for an unknown subject never appears on the timeline", () => {
+  const unknown: WeddingDossier = { subjectId: "inexistant", state: "selection", source: "wedmag", id: "uuid-x" };
+  const timeline = buildProjectTimeline([unknown]);
+  assert.ok(timeline.every((phase) => phase.momentGroups.length === 0));
+});
+
+test("two weddings keep independent dossier maps (no shared state)", () => {
+  const a = project("Mariage A", { dj: entry("uuid-a") });
+  const b = project("Mariage B", { dj: entry("uuid-b", "inspiration") });
+  assert.notEqual(a.dossiers.dj.id, b.dossiers.dj.id);
+  assert.notEqual(a.dossiers.dj.state, b.dossiers.dj.state);
 });

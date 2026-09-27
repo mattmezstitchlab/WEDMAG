@@ -137,3 +137,75 @@ jamais de colonnes « type » fourre-tout, jamais de duplication d'entité.
 | Régression du parcours existant | Le « + » garde son comportement quand aucun mariage n'existe ; batterie runtime complète rejouée (local, 503, PostgreSQL) |
 | UX qui devient SaaS | Aucun nouveau chrome : overlay réutilise la fiche sujet, une seule action par couverture, pas de badge/pill superflu |
 | Faux états simulés | Les 8 états futurs sont modélisés mais refusés à l'écriture (400) — rien n'est affiché comme existant |
+
+---
+
+# PHASE 1.1 — DOSSIER NAVIGABLE
+
+**Date :** 27 septembre 2026 · **Base :** commit `ff72aa7` (Phase 1 validée)
+**Périmètre unique :** faire du dossier le centre de navigation de « Mon mariage ».
+Aucune couche métier (prestataire, contrat, documents, paiements…) — rien de simulé.
+
+## Audit de l'existant (avant code)
+
+| Constat | Détail | Décision |
+|---|---|---|
+| **UUID droppé côté client** | `GET /api/wedding/project` renvoie `dossiers[].id` (uuid) mais le client ne conserve que `{state, source}` — le dossier n'a pas d'identité propre en dehors du `subjectId` | Porter l'UUID dans l'état client ; clé de navigation = `dossier.id ?? subjectId` |
+| **Fiche sujet → drawer** | Le bouton « ✓ DANS MON MARIAGE — VOIR LE PROJET » ouvre le drawer général, pas le dossier du sujet | Ouvrir directement **le dossier** (un écran de moins, navigation dossier-centric) |
+| **Fiche dossier sans retour** | Aucun lien dossier → sujet source ; navigation à sens unique | Ajouter « Voir la couverture » → fiche sujet (bidirectionnalité SUJET ↔ DOSSIER) |
+| **`set-state` sur dossier inexistant** | `UPDATE … WHERE` correspond à 0 ligne → `200 ok:true` (succès mensonger) | `.returning()` + `400 "No dossier for this subject"` |
+| **Statuts concurrents** | Vérifiés : aucun — la timeline mariage affiche l'état du dossier, le pool affiche le statut d'édition (niveaux distincts documentés) | Rien à supprimer |
+| **Timeline** | Les dossiers y sont déjà (Phase 1) ; clic → fiche dossier | Conserver, clé = UUID |
+| **Routing** | Aucune route dossier n'existe ; l'architecture est une page unique statique + overlays (fiche sujet, drawer, fiche dossier) | **Décision documentée : pas de nouvelle route.** La fiche dossier est la vue canonique du dossier — l'« équivalent cohérent avec l'architecture existante » (une route dédiée fragmenterait l'expérience éditoriale et dupliquerait le shell). L'UUID reste la référence stable interne |
+| **Migration / schéma** | Aucun changement de schéma nécessaire — l'UUID existe déjà côté serveur | Pas de migration en 1.1 |
+
+## Modèle de navigation cible
+
+```
+SUJET ÉDITORIAL (couverture, fiche sujet)
+        ↕  « Ajouter à mon mariage » / « Voir la couverture »
+DOSSIER (fiche dossier : couverture = identité, état, chronologie)
+        ↕  timeline « Mon mariage »
+MARIAGE (agrégation de ses dossiers)
+```
+
+Une seule source de vérité : le dossier **référence** son sujet (`subjectId`),
+le client référence le dossier par son **UUID** (retombée locale : `subjectId`
+quand la persistance serveur est absente — `local_only`).
+
+## Modifications exactes (Phase 1.1)
+
+1. **Domaine** (`wedding-pacte.ts`) : `WeddingDossier` et l'état client
+   gagnent `id: string | null` ; `normalizeWeddingState` le parse (uuid
+   valide ou `null`) ; `mergeRestoredWedding` **préserve l'UUID serveur**
+   quand une action locale en cours n'en a pas (fusion par entrée).
+2. **Client** :
+   - l'UUID du dossier est conservé depuis le GET ;
+   - timeline : clé React = `dossier.id ?? subjectId` ;
+   - fiche sujet : si un dossier existe → bouton « OUVRIR LE DOSSIER »
+     (ouvre la fiche dossier, referme la fiche sujet) ;
+   - fiche dossier refondue selon la structure recommandée : grande
+     couverture (identité), titre + état + univers/catégorie, « Ce dossier »
+     (description du sujet source), **Chronologie** (moments canoniques),
+     **État du dossier** (Inspiration/Sélection, persisté), « À venir »
+     (texte éditorial discret — jamais de modules vides ni de « — »),
+     « Voir la couverture » (retour sujet source), retrait du mariage.
+3. **API** : `set-state` refuse proprement un dossier inexistant (400) —
+   plus de succès mensonger. Aucun autre changement de contrat.
+4. **Tests** : domaine (UUID préservé à la fusion, normalisation id
+   valide/invalide), API/runtime (voir §17 de la mission).
+
+## Non construit (rappel)
+
+Prestataire, offre, contrat, documents, paiements, échéances, preuves,
+décisions : **aucun widget, aucune fausse donnée**. L'UUID du dossier reste
+l'ancre métier pour toutes ces couches futures (elles référenceront
+`dossier.id`).
+
+## Risques
+
+- La fusion locale/serveur devient par-entrée (état local gagne, UUID
+  serveur conservé) — couverte par des tests dédiés.
+- Vérification visuelle mobile impossible dans cet environnement (pas de
+  navigateur) — **limitation documentée**, revue CSS statique des
+  breakpoints uniquement.
