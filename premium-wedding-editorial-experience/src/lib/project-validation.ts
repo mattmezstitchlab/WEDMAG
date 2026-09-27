@@ -47,6 +47,8 @@ export type ProjectRequest =
     }
   | { action: "contact-attest"; subjectId: string; contactId: string; note: string | null }
   | { action: "contact-confirm"; subjectId: string; contactId: string; note: string | null }
+  | { action: "contact-proposition"; subjectId: string; contactId: string; note: string | null }
+  | { action: "contact-engage"; subjectId: string; contactId: string; note: string | null }
   | { action: "contact-remove"; subjectId: string; contactId: string };
 
 export type ProjectRequestParse =
@@ -136,7 +138,14 @@ export function parseProjectRequest(body: unknown): ProjectRequestParse {
     return { ok: true, request: { action, subjectId: check.subjectId } };
   }
 
-  if (action === "contact-add" || action === "contact-attest" || action === "contact-confirm" || action === "contact-remove") {
+  if (
+    action === "contact-add" ||
+    action === "contact-attest" ||
+    action === "contact-confirm" ||
+    action === "contact-proposition" ||
+    action === "contact-engage" ||
+    action === "contact-remove"
+  ) {
     const check = validateSubjectId(subjectId);
 
     if (!check.ok) {
@@ -200,8 +209,9 @@ export function parseProjectRequest(body: unknown): ProjectRequestParse {
       };
     }
 
-    // contact-attest / contact-confirm / contact-remove: all address an
-    // existing contact. attest and confirm carry the same optional note.
+    // contact-attest / contact-confirm / contact-proposition /
+    // contact-engage / contact-remove: all address an existing contact.
+    // attest, confirm, proposition and engage carry the same optional note.
     if (typeof contactId !== "string" || contactId.trim().length === 0) {
       return { ok: false, error: "contactId is required" };
     }
@@ -210,7 +220,12 @@ export function parseProjectRequest(body: unknown): ProjectRequestParse {
       return { ok: false, error: "contactId is too long" };
     }
 
-    if (action === "contact-attest" || action === "contact-confirm") {
+    if (
+      action === "contact-attest" ||
+      action === "contact-confirm" ||
+      action === "contact-proposition" ||
+      action === "contact-engage"
+    ) {
       if (note !== undefined && note !== null && typeof note !== "string") {
         return { ok: false, error: "Invalid note" };
       }

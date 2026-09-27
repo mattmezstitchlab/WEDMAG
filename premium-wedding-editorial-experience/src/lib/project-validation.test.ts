@@ -172,6 +172,29 @@ test("contact-attest carries an optional, bounded note", () => {
   }
 });
 
+test("contact-proposition and contact-engage (B2) carry the same optional, bounded note", () => {
+  for (const action of ["contact-proposition", "contact-engage"] as const) {
+    assert.deepEqual(parse({ action, subjectId: "photographe", contactId: "uuid-1", note: "  Sa proposition  " }), {
+      ok: true,
+      request: { action, subjectId: "photographe", contactId: "uuid-1", note: "Sa proposition" },
+    });
+    assert.deepEqual(parse({ action, subjectId: "photographe", contactId: "uuid-1" }), {
+      ok: true,
+      request: { action, subjectId: "photographe", contactId: "uuid-1", note: null },
+    });
+    for (const [label, body, error] of [
+      ["without contactId", { action, subjectId: "photographe" }, "contactId is required"],
+      ["with an oversized note", { action, subjectId: "photographe", contactId: "uuid-1", note: "n".repeat(501) }, "note is too long"],
+      ["with a non-string note", { action, subjectId: "photographe", contactId: "uuid-1", note: 42 }, "Invalid note"],
+      ["with an oversized contactId", { action, subjectId: "photographe", contactId: "c".repeat(65) }, "contactId is too long"],
+    ] as const) {
+      const result = parse(body);
+      assert.equal(result.ok, false, `${action} ${label}`);
+      assert.equal(result.error, error);
+    }
+  }
+});
+
 test("contact-confirm carries an optional, bounded note like contact-attest", () => {
   assert.deepEqual(parse({ action: "contact-confirm", subjectId: "photographe", contactId: "uuid-1", note: "  Il nous a confirmé  " }), {
     ok: true,

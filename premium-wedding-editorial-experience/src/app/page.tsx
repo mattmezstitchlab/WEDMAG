@@ -420,6 +420,81 @@ export default function HomePage() {
     setToast("Confirmation déclarée — vous déclarez que ce professionnel a confirmé.");
   };
 
+  // B2: the couple DECLARES they received this professional's proposition —
+  // the fact only, never its content or price. The dossier moves to
+  // proposition and never backwards.
+  const declareProposition = (subject: Subject, contact: DossierContact) => {
+    const contactId = contact.id ?? crypto.randomUUID();
+    const note = (contactNotes[contactId] ?? "").trim();
+    setWedding((current) => {
+      if (!current) return current;
+      const dossier = current.dossiers[subject.id];
+      if (!dossier) return current;
+      return {
+        ...current,
+        dossiers: {
+          ...current.dossiers,
+          [subject.id]: {
+            ...dossier,
+            state:
+              dossier.state === "inspiration" || dossier.state === "selection" || dossier.state === "contact"
+                ? "proposition"
+                : dossier.state,
+            contacts: dossier.contacts.map((existing) =>
+              existing === contact
+                ? { ...existing, id: contactId, status: "proposition", note: note || existing.note, propositionAt: new Date().toISOString() }
+                : existing,
+            ),
+          },
+        },
+      };
+    });
+    syncWedding({
+      action: "contact-proposition",
+      subjectId: subject.id,
+      contactId,
+      ...(note ? { note } : {}),
+    });
+    setToast("Proposition déclarée — votre dossier passe en Proposition.");
+  };
+
+  // B2: the couple DECLARES their choice. Their words, never presented as a
+  // contract or a verified booking. The dossier reaches engagement only here.
+  const declareEngagement = (subject: Subject, contact: DossierContact) => {
+    const contactId = contact.id ?? crypto.randomUUID();
+    const note = (contactNotes[contactId] ?? "").trim();
+    setWedding((current) => {
+      if (!current) return current;
+      const dossier = current.dossiers[subject.id];
+      if (!dossier) return current;
+      return {
+        ...current,
+        dossiers: {
+          ...current.dossiers,
+          [subject.id]: {
+            ...dossier,
+            state:
+              dossier.state === "engagement" || dossier.state === "contrat" || dossier.state === "confirme" || dossier.state === "preparation" || dossier.state === "jour-j" || dossier.state === "archive"
+                ? dossier.state
+                : "engagement",
+            contacts: dossier.contacts.map((existing) =>
+              existing === contact
+                ? { ...existing, id: contactId, status: "engage", note: note || existing.note, engagedAt: new Date().toISOString() }
+                : existing,
+            ),
+          },
+        },
+      };
+    });
+    syncWedding({
+      action: "contact-engage",
+      subjectId: subject.id,
+      contactId,
+      ...(note ? { note } : {}),
+    });
+    setToast("Choix déclaré — cette personne est votre prestataire, selon vos mots.");
+  };
+
   const removeContact = (subject: Subject, contact: DossierContact) => {
     setWedding((current) => {
       if (!current) return current;
@@ -742,7 +817,7 @@ export default function HomePage() {
           <div><span>02</span><div><b>CHOISISSEZ</b><p>Gardez ce qui vous ressemble : votre dossier commence.</p></div></div>
           <div><span>03</span><div><b>VOTRE DOSSIER</b><p>Chaque choix trouve sa place.</p></div></div>
           <div><span>04</span><div><b>VOTRE PARCOURS</b><p>Ce qui vient ensuite, déduit de votre choix.</p></div></div>
-          <div><span>05</span><div><b>CE QUI S’EST PASSÉ</b><p>Ce que vous déclarez : sélection, contact, confirmation.</p></div></div>
+          <div><span>05</span><div><b>CE QUI S’EST PASSÉ</b><p>Ce que vous déclarez : sélection, contact, proposition, choix.</p></div></div>
           </div>
         </div>
       </section>
@@ -889,7 +964,9 @@ export default function HomePage() {
                                       {settableDossierStates.map((state) => (
                                         <option key={state} value={state}>{dossierStateLabels[state]}</option>
                                       ))}
-                                      {dossier.state === "contact" && <option value="contact" disabled>Contact</option>}
+                                      {dossier.state !== "inspiration" && dossier.state !== "selection" && (
+                                        <option value={dossier.state} disabled>{dossierStateLabels[dossier.state]}</option>
+                                      )}
                                     </select>
                                   )}
                                   <button className="remove-item" onClick={() => detachSubject(subject.id)} aria-label={`Retirer le dossier ${subject.title} du mariage`}>×</button>
@@ -1162,13 +1239,60 @@ export default function HomePage() {
                                     </button>
                                   </div>
                                 </div>
-                              ) : (
+                              ) : contact.status === "confirme" ? (
                                 <div className="contact-declared">
                                   {contact.attestedAt && (
                                     <p className="contact-date">Vous avez déclaré l’avoir contactée le {new Date(contact.attestedAt).toLocaleDateString("fr-FR")}.</p>
                                   )}
                                   {contact.confirmedAt && (
                                     <p className="contact-date">Vous déclarez que ce professionnel a confirmé, le {new Date(contact.confirmedAt).toLocaleDateString("fr-FR")}.</p>
+                                  )}
+                                  {contact.note && <p className="contact-note">« {contact.note} »</p>}
+                                  <div className="contact-attest">
+                                    <input
+                                      value={note}
+                                      onChange={(event) => setContactNotes((current) => ({ ...current, [contactKey]: event.target.value }))}
+                                      placeholder="Sa proposition, en vos mots (optionnel)"
+                                      maxLength={500}
+                                      aria-label="Note sur la proposition déclarée"
+                                    />
+                                    <button className="add-wide" onClick={() => declareProposition(activeDossier, contact)}>
+                                      NOUS AVONS REÇU SA PROPOSITION
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : contact.status === "proposition" ? (
+                                <div className="contact-declared">
+                                  {contact.attestedAt && (
+                                    <p className="contact-date">Vous avez déclaré l’avoir contactée le {new Date(contact.attestedAt).toLocaleDateString("fr-FR")}.</p>
+                                  )}
+                                  {contact.propositionAt && (
+                                    <p className="contact-date">Vous déclarez avoir reçu sa proposition le {new Date(contact.propositionAt).toLocaleDateString("fr-FR")}.</p>
+                                  )}
+                                  {contact.note && <p className="contact-note">« {contact.note} »</p>}
+                                  <div className="contact-attest">
+                                    <input
+                                      value={note}
+                                      onChange={(event) => setContactNotes((current) => ({ ...current, [contactKey]: event.target.value }))}
+                                      placeholder="Pourquoi c’est elle, en vos mots (optionnel)"
+                                      maxLength={500}
+                                      aria-label="Note sur votre choix déclaré"
+                                    />
+                                    <button className="add-wide" onClick={() => declareEngagement(activeDossier, contact)}>
+                                      NOUS L’AVONS CHOISIE
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="contact-declared">
+                                  {contact.attestedAt && (
+                                    <p className="contact-date">Vous avez déclaré l’avoir contactée le {new Date(contact.attestedAt).toLocaleDateString("fr-FR")}.</p>
+                                  )}
+                                  {contact.propositionAt && (
+                                    <p className="contact-date">Vous déclarez avoir reçu sa proposition le {new Date(contact.propositionAt).toLocaleDateString("fr-FR")}.</p>
+                                  )}
+                                  {contact.engagedAt && (
+                                    <p className="contact-date">Vous déclarez l’avoir choisie le {new Date(contact.engagedAt).toLocaleDateString("fr-FR")}.</p>
                                   )}
                                   {contact.note && <p className="contact-note">« {contact.note} »</p>}
                                 </div>
@@ -1226,7 +1350,7 @@ export default function HomePage() {
                 );
               })()}
 
-              <p className="dossier-next">Ce dossier pourra bientôt accueillir votre prestataire, votre contrat, vos documents et vos échéances — chaque couche n’arrivera que lorsqu’elle sera réellement nécessaire.</p>
+              <p className="dossier-next">Contrat, documents et échéances arriveront en leur temps — chaque couche n’arrive que lorsqu’elle est réellement nécessaire.</p>
 
               <button className="add-wide" onClick={() => { setActiveSubject(activeDossier); setActiveDossier(null); }}>
                 REVOIR LA COUVERTURE

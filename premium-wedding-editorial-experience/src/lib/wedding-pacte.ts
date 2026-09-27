@@ -99,7 +99,7 @@ export function isProjectSituation(value: unknown): value is ProjectSituation {
  * is NOT a status: a professional merely visible in the magazine leaves no
  * row anywhere (tracking discoveries would be prospect tracking).
  */
-export const contactStatuses = ["selectionne", "contacte", "confirme"] as const;
+export const contactStatuses = ["selectionne", "contacte", "confirme", "proposition", "engage"] as const;
 
 export type ContactStatus = (typeof contactStatuses)[number];
 
@@ -108,6 +108,8 @@ export const contactStatusLabels: Record<ContactStatus, string> = {
   selectionne: "Sélectionné",
   contacte: "Contacté",
   confirme: "Confirmé",
+  proposition: "Proposition",
+  engage: "Choisi",
 };
 
 export function isContactStatus(value: unknown): value is ContactStatus {
@@ -137,6 +139,17 @@ export type DossierContact = {
    * professional's answer and certifies nothing.
    */
   confirmedAt?: string | null;
+  /**
+   * B2: when the couple declared they received this professional's
+   * proposition. The FACT is stored, never the proposition's content —
+   * no price, no terms, no document (those layers do not exist).
+   */
+  propositionAt?: string | null;
+  /**
+   * B2: when the couple declared they chose this person — their decision,
+   * their words. Never presented as a contract or a verified booking.
+   */
+  engagedAt?: string | null;
 };
 
 /**
@@ -251,6 +264,8 @@ function normalizeDossierContacts(value: unknown): DossierContact[] {
       note?: unknown;
       attestedAt?: unknown;
       confirmedAt?: unknown;
+      propositionAt?: unknown;
+      engagedAt?: unknown;
     };
     const professionalRef =
       typeof contact.professionalRef === "string" && contact.professionalRef.length > 0
@@ -275,6 +290,10 @@ function normalizeDossierContacts(value: unknown): DossierContact[] {
         typeof contact.attestedAt === "string" && contact.attestedAt.length > 0 ? contact.attestedAt : null,
       confirmedAt:
         typeof contact.confirmedAt === "string" && contact.confirmedAt.length > 0 ? contact.confirmedAt : null,
+      propositionAt:
+        typeof contact.propositionAt === "string" && contact.propositionAt.length > 0 ? contact.propositionAt : null,
+      engagedAt:
+        typeof contact.engagedAt === "string" && contact.engagedAt.length > 0 ? contact.engagedAt : null,
     });
   }
   return contacts;

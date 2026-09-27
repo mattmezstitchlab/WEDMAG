@@ -87,10 +87,18 @@ records the declaration, it verifies and certifies nothing;
 professional confirmed (`selection → contacte → confirme`, strict
 sequence) with its own real timestamp — again the couple's words, never
 a verified fact, never a contract, and it never touches the dossier's
-state; `contact-remove` removes the person (including a confirmed one)
-without rewriting the dossier's history. Both moments carry persistent
-timestamps (`attestedAt`, `confirmedAt` — real columns, never a
-substitute via `updatedAt`). See
+state; `contact-proposition` (B2) records the couple's declaration that
+they received the professional's proposition (`confirme → proposition`
+required, the fact only — no price, no content, no document is ever
+stored) and moves the dossier to the proposition state in one atomic
+transaction, never backwards; `contact-engage` (B2) records the couple's
+declared choice (`proposition → engage`) and moves the dossier to the
+engagement state — still their words, never a contract or a verified
+booking; `contact-remove` removes the person (including a confirmed or
+engaged one) without rewriting the dossier's history. Every declared
+moment carries a persistent timestamp (`attestedAt`, `confirmedAt`,
+`propositionAt`, `engagedAt` — real columns, never a substitute via
+`updatedAt`). See
 [`PACTE-MARIAGE.md`](../PACTE-MARIAGE.md) and
 [`WEDMAG-DOSSIERS.md`](../WEDMAG-DOSSIERS.md).
 

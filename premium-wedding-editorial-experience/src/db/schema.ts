@@ -113,6 +113,14 @@ export const weddingDossierContacts = pgTable(
      */
     attestedAt: timestamp("attested_at", { withTimezone: true }),
     confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    /**
+     * B2: proposition_at = when the couple declared they received the
+     * professional's proposition (the fact only — content/price never
+     * stored); engaged_at = when the couple declared they chose this
+     * person. Both are the couple's words, verified by no one.
+     */
+    propositionAt: timestamp("proposition_at", { withTimezone: true }),
+    engagedAt: timestamp("engaged_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

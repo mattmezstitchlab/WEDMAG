@@ -234,8 +234,8 @@ test("only the real situation is settable — no life situation is invented", ()
   }
 });
 
-test("contact statuses model the documented vocabulary, confirme reserved", () => {
-  assert.deepEqual([...contactStatuses], ["selectionne", "contacte", "confirme"]);
+test("contact statuses model the documented declarative chain (B1 + B2)", () => {
+  assert.deepEqual([...contactStatuses], ["selectionne", "contacte", "confirme", "proposition", "engage"]);
   for (const status of contactStatuses) {
     assert.ok(contactStatusLabels[status], `label missing for ${status}`);
     assert.ok(isContactStatus(status));
@@ -255,8 +255,8 @@ test("normalizeWeddingState repairs invalid contacts and drops identity-less row
         source: "wedmag",
         parcoursProgress: 2,
         contacts: [
-          { id: "uuid-1", professionalRef: "photographe:camille-novae", declaredName: null, declaredRole: null, status: "confirme", note: "  Rencontre  ", attestedAt: "2026-09-27T10:00:00.000Z", confirmedAt: "2026-09-28T10:00:00.000Z" },
-          { id: "uuid-2", professionalRef: null, declaredName: "  Marie Dupont  ", declaredRole: "", status: "bogus", note: 42, attestedAt: 42, confirmedAt: 42 },
+          { id: "uuid-1", professionalRef: "photographe:camille-novae", declaredName: null, declaredRole: null, status: "engage", note: "  Rencontre  ", attestedAt: "2026-09-27T10:00:00.000Z", confirmedAt: "2026-09-28T10:00:00.000Z", propositionAt: "2026-09-29T10:00:00.000Z", engagedAt: "2026-09-30T10:00:00.000Z" },
+          { id: "uuid-2", professionalRef: null, declaredName: "  Marie Dupont  ", declaredRole: "", status: "bogus", note: 42, attestedAt: 42, confirmedAt: 42, propositionAt: 42, engagedAt: 42 },
           { id: null, professionalRef: null, declaredName: "   ", status: "selectionne" },
           "pas-un-contact",
         ],
@@ -264,8 +264,8 @@ test("normalizeWeddingState repairs invalid contacts and drops identity-less row
     },
   });
   assert.deepEqual(normalized?.dossiers.photographe.contacts, [
-    { id: "uuid-1", professionalRef: "photographe:camille-novae", declaredName: null, declaredRole: null, status: "confirme", note: "Rencontre", attestedAt: "2026-09-27T10:00:00.000Z", confirmedAt: "2026-09-28T10:00:00.000Z" },
-    { id: "uuid-2", professionalRef: null, declaredName: "Marie Dupont", declaredRole: null, status: "selectionne", note: null, attestedAt: null, confirmedAt: null },
+    { id: "uuid-1", professionalRef: "photographe:camille-novae", declaredName: null, declaredRole: null, status: "engage", note: "Rencontre", attestedAt: "2026-09-27T10:00:00.000Z", confirmedAt: "2026-09-28T10:00:00.000Z", propositionAt: "2026-09-29T10:00:00.000Z", engagedAt: "2026-09-30T10:00:00.000Z" },
+    { id: "uuid-2", professionalRef: null, declaredName: "Marie Dupont", declaredRole: null, status: "selectionne", note: null, attestedAt: null, confirmedAt: null, propositionAt: null, engagedAt: null },
   ]);
   // An older mirror without contacts gains an empty list — never invented.
   const upgraded = normalizeWeddingState({ name: "Mon mariage", items: { dj: { source: "wedmag" } } });

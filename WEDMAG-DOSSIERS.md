@@ -1145,3 +1145,17 @@ un contrat. Aucun prix, aucun contenu de devis, aucun document, aucune
   « NOUS L'AVONS CHOISI ».
 - Hors périmètre B2 : prix, contenu de devis, contrat, documents, paiement,
   échéances, timeline, adaptation automatique du parcours, registre global, CRM.
+
+### B2 — vérifications (toutes vertes)
+
+- 124/124 tests (123 + suite contact-proposition/contact-engage), lint,
+  typecheck, build.
+- PostgreSQL 18.4 réel (embarqué, port 5433), migration 0000→0007 fraîche :
+  chaîne complète create → attach → contact-add → attest → confirm →
+  proposition → engage ; état dossier final `engagement`, statut contact
+  `engage`, 4 horodatages réels ordonnés, note préservée.
+- Rejets vérifiés : proposition avant confirmé (400), engage avant proposition
+  (400), re-confirm (400), engage double (400), proposition après engage
+  (400 — jamais en arrière), set-state proposition/engagement refusé.
+- Chemin de mise à niveau : base niveau 0006 avec un contact confirmé →
+  0007 appliqué → données intactes, `proposition_at`/`engaged_at` NULL.

@@ -21,6 +21,8 @@ type StoredContact = {
   note: string | null;
   attestedAt: string | null;
   confirmedAt: string | null;
+  propositionAt: string | null;
+  engagedAt: string | null;
 };
 
 type StoredDossier = {
@@ -78,6 +80,8 @@ async function loadProject(db: ReturnType<typeof getDb>, sessionId: string): Pro
           note: weddingDossierContacts.note,
           attestedAt: weddingDossierContacts.attestedAt,
           confirmedAt: weddingDossierContacts.confirmedAt,
+          propositionAt: weddingDossierContacts.propositionAt,
+          engagedAt: weddingDossierContacts.engagedAt,
         })
         .from(weddingDossierContacts)
         .where(inArray(weddingDossierContacts.dossierId, dossierRows.map((dossier) => dossier.id)))
@@ -98,6 +102,8 @@ async function loadProject(db: ReturnType<typeof getDb>, sessionId: string): Pro
       // them with the browser's locale.
       attestedAt: row.attestedAt ? new Date(row.attestedAt).toISOString() : null,
       confirmedAt: row.confirmedAt ? new Date(row.confirmedAt).toISOString() : null,
+      propositionAt: row.propositionAt ? new Date(row.propositionAt).toISOString() : null,
+      engagedAt: row.engagedAt ? new Date(row.engagedAt).toISOString() : null,
     });
     contactsByDossier.set(row.dossierId, bucket);
   }
@@ -378,6 +384,104 @@ export async function POST(request: Request) {
             updatedAt: sql`now()`,
           })
           .where(eq(weddingDossierContacts.id, contact.id));
+      } else if (action.action === "contact-proposition") {
+        // B2: the couple DECLARES they received this professional's
+        // proposition. Only the fact is stored — never the content, never
+        // a price, never a document (those layers do not exist). Strict
+        // sequence: the professional must have confirmed first.
+        const dossier = await loadDossier(db, project.id, action.subjectId);
+        if (!dossier) {
+          return NextResponse.json({ error: "No dossier for this subject" }, { status: 400 });
+        }
+
+        const [contact] = await db
+          .select({ id: weddingDossierContacts.id, status: weddingDossierContacts.status, note: weddingDossierContacts.note })
+          .from(weddingDossierContacts)
+          .where(
+            and(
+              eq(weddingDossierContacts.dossierId, dossier.id),
+              eq(weddingDossierContacts.id, action.contactId),
+            ),
+          )
+          .limit(1);
+
+        if (!contact) {
+          return NextResponse.json({ error: "Unknown contact" }, { status: 400 });
+        }
+        if (contact.status !== "confirme") {
+          return NextResponse.json({ error: "Contact is not confirmed yet" }, { status: 400 });
+        }
+
+        await db.transaction(async (tx) => {
+          await tx
+            .update(weddingDossierContacts)
+            .set({
+              status: "proposition",
+              note: action.note ?? contact.note,
+              propositionAt: sql`now()`,
+              updatedAt: sql`now()`,
+            })
+            .where(eq(weddingDossierContacts.id, contact.id));
+
+          // The dossier reaches the proposition state ONLY through this
+          // declared fact — and it never moves backwards (an already
+          // engaged dossier stays engaged).
+          if (dossier.state !== "proposition" && dossier.state !== "engagement" && dossier.state !== "contrat" && dossier.state !== "confirme" && dossier.state !== "preparation" && dossier.state !== "jour-j" && dossier.state !== "archive") {
+            await tx
+              .update(weddingDossiers)
+              .set({ state: "proposition", updatedAt: sql`now()` })
+              .where(eq(weddingDossiers.id, dossier.id));
+          }
+        });
+      } else if (action.action === "contact-engage") {
+        // B2: the couple DECLARES their choice — this person is the one.
+        // Their words, their decision, recorded with its own timestamp:
+        // never a contract, never a verified booking. Strict sequence:
+        // a proposition must have been declared first.
+        const dossier = await loadDossier(db, project.id, action.subjectId);
+        if (!dossier) {
+          return NextResponse.json({ error: "No dossier for this subject" }, { status: 400 });
+        }
+
+        const [contact] = await db
+          .select({ id: weddingDossierContacts.id, status: weddingDossierContacts.status, note: weddingDossierContacts.note })
+          .from(weddingDossierContacts)
+          .where(
+            and(
+              eq(weddingDossierContacts.dossierId, dossier.id),
+              eq(weddingDossierContacts.id, action.contactId),
+            ),
+          )
+          .limit(1);
+
+        if (!contact) {
+          return NextResponse.json({ error: "Unknown contact" }, { status: 400 });
+        }
+        if (contact.status !== "proposition") {
+          return NextResponse.json({ error: "Contact has no declared proposition yet" }, { status: 400 });
+        }
+
+        await db.transaction(async (tx) => {
+          await tx
+            .update(weddingDossierContacts)
+            .set({
+              status: "engage",
+              note: action.note ?? contact.note,
+              engagedAt: sql`now()`,
+              updatedAt: sql`now()`,
+            })
+            .where(eq(weddingDossierContacts.id, contact.id));
+
+          // The dossier reaches the engagement state ONLY through the
+          // couple's declared choice — never via set-state, never
+          // backwards from a later state.
+          if (dossier.state !== "engagement" && dossier.state !== "contrat" && dossier.state !== "confirme" && dossier.state !== "preparation" && dossier.state !== "jour-j" && dossier.state !== "archive") {
+            await tx
+              .update(weddingDossiers)
+              .set({ state: "engagement", updatedAt: sql`now()` })
+              .where(eq(weddingDossiers.id, dossier.id));
+          }
+        });
       } else if (action.action === "contact-remove") {
         // Removing a person never rewrites history: the dossier keeps its
         // state (the couple may go back via Inspiration/Selection — a human
