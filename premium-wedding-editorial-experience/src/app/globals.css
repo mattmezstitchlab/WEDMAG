@@ -17,7 +17,7 @@ button { cursor: pointer; }
 button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--hot); outline-offset: 3px; }
 ::selection { background: var(--hot); color: #fff; }
 
-.site-header { height: 72px; padding: 0 3.1vw; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); position: absolute; top: 0; left: 0; right: 0; z-index: 5; color: white; mix-blend-mode: normal; }
+.site-header { height: 72px; padding: 0 3.1vw; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 5; color: white; background: var(--ink); mix-blend-mode: normal; }
 .wordmark { font-size: 11px; line-height: .87; letter-spacing: -.05em; text-align: left; border: 0; padding: 0; background: transparent; color: inherit; font-weight: 900; }
 .wordmark span { display: block; }
 .wordmark em { display: block; font-style: normal; font-size: 16px; letter-spacing: -.085em; }
@@ -28,7 +28,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .project-trigger b { min-width: 26px; height: 26px; display: grid; place-items: center; color: var(--hot); background: white; font-size: 12px; letter-spacing: 0; }
 
 .hero { min-height: 786px; background: var(--ink); color: white; display: grid; grid-template-columns: .96fr 1.04fr; overflow: hidden; position: relative; }
-.hero-copy { align-self: end; padding: 140px 4vw 98px 7.6vw; position: relative; z-index: 2; }
+.hero-copy { align-self: end; padding: 68px 4vw 98px 7.6vw; position: relative; z-index: 2; }
 .edition-label, .section-kicker { margin: 0; font-size: 10px; letter-spacing: .17em; font-weight: 800; text-transform: uppercase; }
 .hero h1 { font-size: clamp(58px, 6.8vw, 116px); line-height: .8; letter-spacing: -.092em; margin: 30px 0 40px; font-weight: 900; }
 h1 i, h2 i { font-family: Georgia, "Times New Roman", serif; font-weight: 400; letter-spacing: -.09em; }
@@ -164,10 +164,6 @@ footer { min-height: 160px; background: var(--ink); color: white; padding: 38px 
 .attach-pill { border: 1px solid var(--ink); background: transparent; color: var(--ink); padding: 7px 10px; font-size: 8px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; white-space: nowrap; }
 .attach-pill:hover { background: var(--hot); border-color: var(--hot); color: white; }
 .create-section { border-top: 1px solid var(--ink); padding-top: 16px; }
-.create-lede { font-family: Georgia, serif; font-size: 17px; line-height: 1.2; margin: 12px 0 16px; max-width: 400px; }
-.create-field { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: stretch; }
-.create-field input { border: 1px solid var(--line); background: transparent; padding: 10px 13px; font-size: 13px; color: var(--ink); min-width: 0; }
-.create-field input::placeholder { color: #716e68; }
 
 /* WEDMAG dossiers — état du dossier + fiche dossier */
 .state-inspiration { background: #e5dfd4; color: var(--ink); }
@@ -232,12 +228,12 @@ footer { min-height: 160px; background: var(--ink); color: white; padding: 38px 
 
 @media (max-width: 860px) {
   .site-header { height: 61px; padding: 0 17px; }.site-header nav { display: none; }.wordmark { font-size: 9px; }.wordmark em { font-size: 13px; }.project-trigger { min-height: 31px; font-size: 8px; padding-left: 9px; gap: 9px; }.project-trigger b { width: 23px; height: 23px; min-width: 23px; }
-  .hero { min-height: 740px; display: block; }.hero-copy { position: relative; z-index: 3; padding: 113px 24px 66px; }.hero h1 { font-size: clamp(59px, 17.5vw, 100px); margin: 21px 0 29px; }.hero-statement { font-size: 21px; }.hero-art { position: absolute; inset: 0; min-height: 0; opacity: .78; }.hero-art::after { background: linear-gradient(90deg, var(--ink) 0%, rgba(16,16,16,.77) 56%, rgba(16,16,16,.22) 100%); }.hero-number { top: 82px; right: 8px; font-size: 190px; }.hero-cover { width: 180px; }.cover-back { top: 129px; right: -28px; }.cover-front { top: 281px; left: auto; right: 38px; }.hero-caption { display: none; }
+  .site-header nav { margin-left: auto; gap: 14px; }.hero { min-height: 740px; display: block; }.hero-copy { position: relative; z-index: 3; padding: 41px 24px 66px; }.hero h1 { font-size: clamp(59px, 17.5vw, 100px); margin: 21px 0 29px; }.hero-statement { font-size: 21px; }.hero-art { position: absolute; inset: 0; min-height: 0; opacity: .78; }.hero-art::after { background: linear-gradient(90deg, var(--ink) 0%, rgba(16,16,16,.77) 56%, rgba(16,16,16,.22) 100%); }.hero-number { top: 82px; right: 8px; font-size: 190px; }.hero-cover { width: 180px; }.cover-back { top: 129px; right: -28px; }.cover-front { top: 281px; left: auto; right: 38px; }.hero-caption { display: none; }
   .manifesto { padding: 80px 24px; }.manifesto-grid { grid-template-columns: 1fr; gap: 48px; }.manifesto h2, .magazine h2 { font-size: clamp(47px, 13.5vw, 75px); }.manifesto-steps p { font-size: 17px; } .statement { padding: 72px 24px 64px; }.statement-line { font-size: clamp(19px, 6.4vw, 26px); }.flow-chain { margin-top: 38px; gap: 6px; }.feature-section { grid-template-columns: 1fr; min-height: 0; }.feature-visual { min-height: 290px; order: -1; }.feature-body { padding: 52px 24px 58px; }.timeline-section { padding: 62px 24px 70px; }.timeline-preview { grid-template-columns: 1fr; gap: 20px; }
   .magazine { padding: 70px 17px 87px; }.magazine-head { margin-bottom: 36px; }.issue-counter { width: 105px; }.issue-counter span { display: none; }.filter-bar { grid-template-columns: 1fr; min-height: auto; }.search-field { height: 54px; border-right: 0; padding: 0 3px; border-bottom: 1px solid var(--line); }.filter-scroll { height: 48px; padding: 10px 0; }.cover-count-line { margin: 14px 0 23px; }.cover-count-line span:last-child { display: none; }.cover-shelf { grid-template-columns: repeat(2, 1fr); gap: 12px; }.mag-cover { margin-top: 0; }.cover-2, .cover-4, .cover-6 { margin-top: 36px; }.cover-content h3 { font-size: clamp(28px, 8.7vw, 49px); }.next-edition { margin-top: 80px; grid-template-columns: 1fr; gap: 15px; }.next-edition button { justify-self: start; }
   .closing-cta { min-height: 555px; grid-template-columns: 1fr; position: relative; }.closing-image { min-height: 0; position: absolute; inset: 0; opacity: .22; }.closing-cta > div:last-child { position: relative; padding: 74px 24px; }.closing-cta h2 { font-size: clamp(46px, 13.5vw, 75px); } footer { grid-template-columns: 1fr; padding: 31px 24px; gap: 17px; } footer > span { text-align: left; }
   .overlay { padding: 0; }.subject-sheet { width: 100%; height: 100%; max-height: 100vh; display: block; }.subject-visual { min-height: 390px; position: relative; }.subject-story { padding: 30px 24px 34px; }.subject-lede { font-size: 25px; }.subject-visual h2 { font-size: 65px; }.sheet-columns { gap: 15px; }.close-sheet { top: 14px; right: 14px; }
-  .project-drawer { padding: 25px 20px 35px; }.drawer-head h2 { font-size: 62px; }.project-line span:last-child { display: none; }.project-item { grid-template-columns: 42px 1fr auto 20px; gap: 8px; }.project-thumb { width: 42px; height: 42px; }.project-item select { max-width: 88px; font-size: 8px; }.check-list { grid-template-columns: 1fr; }.project-reading p:last-child { font-size: 18px; }.pool-item { grid-template-columns: 42px 1fr auto auto 20px; }.attach-pill { padding: 7px 8px; }.create-field { grid-template-columns: 1fr; }.state-pill { padding: 8px 10px; }.parcours-steps li { grid-template-columns: 28px 1fr; padding: 9px 0; }.parcours-transition { font-size: 19px; } .people-add { grid-template-columns: 1fr; }.people-reference { gap: 9px; }.people-contact { padding-right: 24px; }
+  .project-drawer { padding: 25px 20px 35px; }.drawer-head h2 { font-size: 62px; }.project-line span:last-child { display: none; }.project-item { grid-template-columns: 42px 1fr auto 20px; gap: 8px; }.project-thumb { width: 42px; height: 42px; }.project-item select { max-width: 88px; font-size: 8px; }.check-list { grid-template-columns: 1fr; }.project-reading p:last-child { font-size: 18px; }.pool-item { grid-template-columns: 42px 1fr auto auto 20px; }.attach-pill { padding: 7px 8px; }.state-pill { padding: 8px 10px; }.parcours-steps li { grid-template-columns: 28px 1fr; padding: 9px 0; }.parcours-transition { font-size: 19px; } .people-add { grid-template-columns: 1fr; }.people-reference { gap: 9px; }.people-contact { padding-right: 24px; }
 }
 
 @media (max-width: 400px) {

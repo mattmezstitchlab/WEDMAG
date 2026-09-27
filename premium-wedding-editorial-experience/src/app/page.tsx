@@ -53,34 +53,6 @@ function CoverMark({ number, light = false }: { number: number; light?: boolean 
  * structured project. One optional name, nothing else: the system learns
  * progressively from validated actions, never from a giant form.
  */
-function CreateWeddingSection({
-  name,
-  onNameChange,
-  onCreate,
-}: {
-  name: string;
-  onNameChange: (value: string) => void;
-  onCreate: () => void;
-}) {
-  return (
-    <section className="project-section create-section">
-      <p className="section-kicker">DE L’INSPIRATION AU PROJET</p>
-      <p className="create-lede">Vos inspirations peuvent devenir la matière d’un vrai projet : une timeline, des éléments reliés, des décisions qui vous appartiennent.</p>
-      <div className="create-field">
-        <input
-          value={name}
-          onChange={(event) => onNameChange(event.target.value)}
-          placeholder="Mon mariage"
-          aria-label="Nom de votre projet mariage"
-          maxLength={80}
-        />
-        <button className="button button-fuchsia" onClick={onCreate}>CRÉER MON PROJET <span>→</span></button>
-      </div>
-    </section>
-  );
-}
-
-
 export default function HomePage() {
   const [project, setProject] = useState<SelectionMap>({});
   const [activeSubject, setActiveSubject] = useState<Subject | null>(null);
@@ -94,7 +66,6 @@ export default function HomePage() {
   // visitor creates it — inspirations live in `project` until then).
   const [wedding, setWedding] = useState<WeddingProjectState | null>(null);
   const [weddingHydrated, setWeddingHydrated] = useState(false);
-  const [newWeddingName, setNewWeddingName] = useState("");
   // The dossier currently open (its cover stays its visual identity).
   const [activeDossier, setActiveDossier] = useState<Subject | null>(null);
   // Phase A — CONTACT: minimal editorial inputs (no form wall, two fields).
@@ -468,14 +439,25 @@ export default function HomePage() {
 
   const addSubject = (subject: Subject) => {
     if (project[subject.id]) {
-      setDrawerOpen(true);
+      // Already chosen: one click opens THAT dossier — not the general view.
+      // (Older picks without a dossier still fall back to the wedding view,
+      // which offers to create it.)
+      if (wedding?.dossiers[subject.id]) setActiveDossier(subject);
+      else setDrawerOpen(true);
       return;
     }
     setProject((current) => ({ ...current, [subject.id]: "interested" }));
     syncSelection(subject.id, "interested");
-    // A cover added to an existing wedding opens its dossier right away —
+    // The very first choice creates the wedding itself — one gesture, no
+    // form: feuilletter and choose is all the visitor ever has to do.
+    const firstChoice = !wedding;
+    if (firstChoice) {
+      setWedding({ name: "Mon mariage", dossiers: {} });
+      syncWedding({ action: "create", name: "Mon mariage" });
+    }
+    // A cover added to a wedding opens its dossier right away —
     // the act of adding IS the selection (see WEDMAG-DOSSIERS.md).
-    if (wedding && !wedding.dossiers[subject.id]) {
+    if (!wedding?.dossiers[subject.id]) {
       setWedding((current) =>
         current
           ? { ...current, dossiers: { ...current.dossiers, [subject.id]: { id: null, state: "selection", source: "wedmag", parcoursProgress: 0, contacts: [] } } }
@@ -485,7 +467,9 @@ export default function HomePage() {
       // Editorial transition: the fresh dossier opens on its parcours —
       // the couple immediately sees what this choice has become.
       setActiveDossier(subject);
-      setToast(`Le dossier ${subject.title} est créé. Nous avons préparé un parcours pour vous.`);
+      setToast(firstChoice
+        ? `Votre mariage est créé. Le dossier ${subject.title} s’ouvre avec son parcours.`
+        : `Le dossier ${subject.title} est créé. Nous avons préparé un parcours pour vous.`);
       return;
     }
     setToast(`${subject.title} rejoint votre mariage.`);
@@ -521,11 +505,9 @@ export default function HomePage() {
   // --- Dossiers: create, detach, set-state (propose → validate) ---
 
   const createWedding = () => {
-    const name = newWeddingName.trim() || "Mon mariage";
-    setWedding({ name, dossiers: {} });
-    setNewWeddingName("");
-    syncWedding({ action: "create", name });
-    setToast(`« ${name} » est créé. Ajoutez une couverture : son dossier s'ouvrira aussitôt.`);
+    setWedding({ name: "Mon mariage", dossiers: {} });
+    syncWedding({ action: "create", name: "Mon mariage" });
+    setToast("Votre mariage est créé. Ajoutez une couverture : son dossier s’ouvrira aussitôt.");
   };
 
   const attachSubject = (subjectId: string) => {
@@ -666,7 +648,7 @@ export default function HomePage() {
         </nav>
         <button className="project-trigger" onClick={() => setDrawerOpen(true)}>
           <span>MON MARIAGE</span>
-          <b>{selectedSubjects.length}</b>
+          <b>{wedding ? attachedCount : selectedSubjects.length}</b>
         </button>
       </header>
 
@@ -976,10 +958,9 @@ export default function HomePage() {
               </div>
             ) : !selectedSubjects.length ? (
               <div className="project-empty">
-                <p>Votre édition est encore blanche.</p>
-                <span>Feuilletez les couvertures, cochez ce qui vous touche. Ici, les relations commenceront à apparaître.</span>
+                <p>Votre mariage commence ici.</p>
+                <span>Cochez une première couverture : votre mariage se crée tout seul, son dossier s’ouvre avec son parcours.</span>
                 <button className="button button-fuchsia" onClick={() => { setDrawerOpen(false); scrollToMagazine(); }}>FEUILLETER <span>↓</span></button>
-                <CreateWeddingSection name={newWeddingName} onNameChange={setNewWeddingName} onCreate={createWedding} />
               </div>
             ) : (
               <div className="project-content">
@@ -1027,7 +1008,10 @@ export default function HomePage() {
                   </article>)}</div>
                 </section>}
 
-                <CreateWeddingSection name={newWeddingName} onNameChange={setNewWeddingName} onCreate={createWedding} />
+                <section className="project-section create-section">
+                  <p className="section-kicker">VOS CHOIX PEUVENT DEVENIR UN PROJET</p>
+                  <button className="add-wide" onClick={createWedding}>CRÉER MON MARIAGE</button>
+                </section>
 
                 <button className="back-to-magazine" onClick={() => { setDrawerOpen(false); scrollToMagazine(); }}>← CONTINUER À FEUILLETER</button>
               </div>
