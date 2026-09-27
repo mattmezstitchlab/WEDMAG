@@ -30,6 +30,15 @@ export const weddingProjects = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     sessionId: text("session_id").notNull(),
     name: text("name").notNull(),
+    /**
+     * Eden du Mont Noir / programmes de vie: the LIFE SITUATION this project
+     * accompanies (see WEDMAG-DOSSIERS.md). The full vocabulary is modelled
+     * (projectSituations) but only "mariage" is real today — every existing
+     * project IS a wedding, which is a fact recorded, never an invention.
+     * Future situations (naissance, deuil…) stay un-settable until real
+     * content exists for them.
+     */
+    situation: text("situation").notNull().default("mariage"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

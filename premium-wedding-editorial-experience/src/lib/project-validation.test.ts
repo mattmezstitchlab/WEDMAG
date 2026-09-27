@@ -4,17 +4,19 @@ import { defaultProjectName, parseProjectRequest } from "./project-validation";
 
 const parse = (body: unknown) => parseProjectRequest(body);
 
-test("create defaults to the documented name when none is given", () => {
-  assert.deepEqual(parse({ action: "create" }), { ok: true, request: { action: "create", name: defaultProjectName } });
-  assert.deepEqual(parse({ action: "create", name: "" }), { ok: true, request: { action: "create", name: defaultProjectName } });
-  assert.deepEqual(parse({ action: "create", name: "   " }), { ok: true, request: { action: "create", name: defaultProjectName } });
-  assert.deepEqual(parse({ action: "create", name: null }), { ok: true, request: { action: "create", name: defaultProjectName } });
+test("create defaults to the documented name and the only real situation when none is given", () => {
+  const expected = { ok: true, request: { action: "create", name: defaultProjectName, situation: "mariage" } };
+  assert.deepEqual(parse({ action: "create" }), expected);
+  assert.deepEqual(parse({ action: "create", name: "" }), expected);
+  assert.deepEqual(parse({ action: "create", name: "   " }), expected);
+  assert.deepEqual(parse({ action: "create", name: null }), expected);
+  assert.deepEqual(parse({ action: "create", situation: null }), expected);
 });
 
 test("create trims and keeps a valid name", () => {
   assert.deepEqual(parse({ action: "create", name: "  Le mariage d’Été  " }), {
     ok: true,
-    request: { action: "create", name: "Le mariage d’Été" },
+    request: { action: "create", name: "Le mariage d’Été", situation: "mariage" },
   });
 });
 
@@ -29,6 +31,38 @@ test("create rejects a non-string name", () => {
     const result = parse({ action: "create", name });
     assert.equal(result.ok, false, `name ${JSON.stringify(name)} must be rejected`);
     assert.equal(result.error, "Invalid name");
+  }
+});
+
+test("create accepts the only situation that is real today", () => {
+  assert.deepEqual(parse({ action: "create", situation: "mariage" }), {
+    ok: true,
+    request: { action: "create", name: defaultProjectName, situation: "mariage" },
+  });
+  assert.deepEqual(parse({ action: "create", situation: "  mariage  " }), {
+    ok: true,
+    request: { action: "create", name: defaultProjectName, situation: "mariage" },
+  });
+});
+
+test("create rejects an unknown or malformed situation, never coerced", () => {
+  for (const situation of [42, true, {}, ["mariage"]]) {
+    const result = parse({ action: "create", situation });
+    assert.equal(result.ok, false, `situation ${JSON.stringify(situation)} must be rejected`);
+    assert.equal(result.error, "Invalid situation");
+  }
+  for (const situation of ["fitness", "mariage-hack", "wedding", "MARIAGE", "diplome"]) {
+    const result = parse({ action: "create", situation });
+    assert.equal(result.ok, false, `situation ${situation} must be rejected`);
+    assert.equal(result.error, "Invalid situation");
+  }
+});
+
+test("create refuses a modelled situation that is not real yet — nothing is invented", () => {
+  for (const situation of ["naissance", "deuil", "reconnexion", "couple-famille", "transmission"]) {
+    const result = parse({ action: "create", situation });
+    assert.equal(result.ok, false, `situation ${situation} must not be creatable yet`);
+    assert.equal(result.error, "situation is not available yet");
   }
 });
 

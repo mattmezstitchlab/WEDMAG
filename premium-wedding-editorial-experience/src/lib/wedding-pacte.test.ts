@@ -9,7 +9,11 @@ import {
   isDossierState,
   mergeRestoredWedding,
   normalizeWeddingState,
+  isProjectSituation,
+  projectSituationLabels,
+  projectSituations,
   settableDossierStates,
+  settableProjectSituations,
   weddingPhases,
   type WeddingDossier,
   type WeddingProjectState,
@@ -203,6 +207,25 @@ test("the dossier lifecycle models the ten documented states in order", () => {
 
 test("phase 1 only exposes inspiration and selection as settable", () => {
   assert.deepEqual([...settableDossierStates], ["inspiration", "selection"]);
+});
+
+test("the domain models the six documented life situations, mariage first", () => {
+  assert.deepEqual([...projectSituations], [
+    "mariage", "naissance", "deuil", "reconnexion", "couple-famille", "transmission",
+  ]);
+  for (const situation of projectSituations) {
+    assert.ok(projectSituationLabels[situation], `label missing for ${situation}`);
+    assert.ok(isProjectSituation(situation));
+  }
+  assert.equal(isProjectSituation("mariage-hack"), false);
+  assert.equal(isProjectSituation(42), false);
+});
+
+test("only the real situation is settable — no life situation is invented", () => {
+  assert.deepEqual([...settableProjectSituations], ["mariage"]);
+  for (const situation of settableProjectSituations) {
+    assert.ok((projectSituations as readonly string[]).includes(situation));
+  }
 });
 
 // --- normalizeWeddingState: localStorage upgrade ---

@@ -23,12 +23,17 @@ type StoredDossier = {
 type StoredProject = {
   id: string;
   name: string;
+  situation: string;
   dossiers: StoredDossier[];
 };
 
 async function loadProject(db: ReturnType<typeof getDb>, sessionId: string): Promise<StoredProject | null> {
   const [project] = await db
-    .select()
+    .select({
+      id: weddingProjects.id,
+      name: weddingProjects.name,
+      situation: weddingProjects.situation,
+    })
     .from(weddingProjects)
     .where(eq(weddingProjects.sessionId, sessionId))
     .limit(1);
@@ -47,7 +52,7 @@ async function loadProject(db: ReturnType<typeof getDb>, sessionId: string): Pro
     .where(eq(weddingDossiers.projectId, project.id))
     .orderBy(weddingDossiers.createdAt);
 
-  return { id: project.id, name: project.name, dossiers };
+  return { id: project.id, name: project.name, situation: project.situation, dossiers };
 }
 
 async function touchProject(db: ReturnType<typeof getDb>, projectId: string) {
@@ -108,9 +113,11 @@ export async function POST(request: Request) {
 
     if (action.action === "create") {
       // Idempotent: the unique session index keeps one project per session.
+      // The situation was validated against the modelled vocabulary before
+      // this point — only real situations ever reach the database.
       await db
         .insert(weddingProjects)
-        .values({ sessionId, name: action.name })
+        .values({ sessionId, name: action.name, situation: action.situation })
         .onConflictDoNothing({ target: weddingProjects.sessionId });
     } else {
       const [project] = await db

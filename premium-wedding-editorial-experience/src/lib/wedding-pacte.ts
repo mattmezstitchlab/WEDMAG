@@ -49,6 +49,45 @@ export function isDossierState(value: unknown): value is DossierState {
   return typeof value === "string" && (dossierStates as readonly string[]).includes(value);
 }
 
+// --- Life situations (Eden du Mont Noir / programmes de vie) ---
+
+/**
+ * The life situations a project can accompany (WEDMAG-DOSSIERS.md, phase
+ * "L'Eden du Mont Noir / programmes de vie"). The whole vocabulary is
+ * modelled exactly like dossierStates, and exposed just as progressively:
+ * only "mariage" is REAL today — the other keys exist so the engine can
+ * recognize them later, but no project may be created under them until
+ * real editorial content (covers, moments, parcours) exists. A situation
+ * is never invented: create refuses anything not settable.
+ */
+export const projectSituations = [
+  "mariage",
+  "naissance",
+  "deuil",
+  "reconnexion",
+  "couple-famille",
+  "transmission",
+] as const;
+
+export type ProjectSituation = (typeof projectSituations)[number];
+
+/** Editorial labels — the only vocabulary shown to the user. */
+export const projectSituationLabels: Record<ProjectSituation, string> = {
+  mariage: "Mariage",
+  naissance: "Naissance",
+  deuil: "Deuil",
+  reconnexion: "Reconnexion",
+  "couple-famille": "Couple & famille",
+  transmission: "Transmission",
+};
+
+/** The only situation that is real (and thus settable) in this increment. */
+export const settableProjectSituations = ["mariage"] as const;
+
+export function isProjectSituation(value: unknown): value is ProjectSituation {
+  return typeof value === "string" && (projectSituations as readonly string[]).includes(value);
+}
+
 /**
  * A dossier of the wedding project. Born from a cover added to the wedding,
  * it keeps the catalogue subject as its identity (reference, never a copy).

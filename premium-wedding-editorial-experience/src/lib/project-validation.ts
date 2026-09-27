@@ -1,5 +1,11 @@
 import { validateSubjectId } from "./selection-validation";
-import { isDossierState, settableDossierStates } from "./wedding-pacte";
+import {
+  isDossierState,
+  isProjectSituation,
+  projectSituations,
+  settableDossierStates,
+  settableProjectSituations,
+} from "./wedding-pacte";
 
 /**
  * Validation for POST /api/wedding/project (WEDMAG dossiers / PACTE layer).
@@ -13,10 +19,13 @@ import { isDossierState, settableDossierStates } from "./wedding-pacte";
 /** The only name the create action defaults to when none is given. */
 export const defaultProjectName = "Mon mariage";
 
+/** The only situation the create action defaults to — the one that is real. */
+export const defaultProjectSituation = "mariage";
+
 const maxProjectNameLength = 80;
 
 export type ProjectRequest =
-  | { action: "create"; name: string }
+  | { action: "create"; name: string; situation: string }
   | { action: "attach"; subjectId: string }
   | { action: "detach"; subjectId: string }
   | { action: "set-state"; subjectId: string; state: string }
@@ -31,9 +40,10 @@ export function parseProjectRequest(body: unknown): ProjectRequestParse {
     return { ok: false, error: "Invalid request body" };
   }
 
-  const { action, name, subjectId, state } = body as {
+  const { action, name, situation, subjectId, state } = body as {
     action?: unknown;
     name?: unknown;
+    situation?: unknown;
     subjectId?: unknown;
     state?: unknown;
   };
@@ -49,7 +59,34 @@ export function parseProjectRequest(body: unknown): ProjectRequestParse {
       return { ok: false, error: "name is too long" };
     }
 
-    return { ok: true, request: { action: "create", name: trimmed || defaultProjectName } };
+    // The life situation is optional and defaults to the only real one. The
+    // whole vocabulary is modelled, but a situation that is not real yet is
+    // refused explicitly — never simulated (same rule as reserved states).
+    if (situation !== undefined && situation !== null && typeof situation !== "string") {
+      return { ok: false, error: "Invalid situation" };
+    }
+
+    const situationValue = typeof situation === "string" ? situation.trim() : "";
+
+    if (situationValue.length > 0 && !isProjectSituation(situationValue)) {
+      return { ok: false, error: "Invalid situation" };
+    }
+
+    if (
+      situationValue.length > 0 &&
+      !(settableProjectSituations as readonly string[]).includes(situationValue)
+    ) {
+      return { ok: false, error: "situation is not available yet" };
+    }
+
+    return {
+      ok: true,
+      request: {
+        action: "create",
+        name: trimmed || defaultProjectName,
+        situation: situationValue.length > 0 ? situationValue : defaultProjectSituation,
+      },
+    };
   }
 
   if (action === "attach" || action === "detach" || action === "set-state" || action === "parcours-step") {

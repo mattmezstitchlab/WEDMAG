@@ -1,0 +1,1 @@
+ALTER TABLE "wedding_projects" ADD COLUMN "situation" text DEFAULT 'mariage' NOT NULL;

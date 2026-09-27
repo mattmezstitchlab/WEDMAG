@@ -54,7 +54,8 @@ The app degrades on purpose:
   schema's own default.
 
 The PACTE marriage layer adds `GET` / `POST /api/wedding/project` with the
-same rules: `create` (idempotent, one project per session, optional name),
+same rules: `create` (idempotent, one project per session, optional name
+and optional `situation` — the life situation the project accompanies),
 `attach` (opens the subject's **dossier**, initial state `selection`) /
 `detach`, `set-state` (dossier state) and `parcours-step` (validates the
 next step of the dossier's recommended parcours — the arc is derived from
@@ -62,7 +63,12 @@ the catalogue subject, progress is a simple counter on the dossier). The dossier
 modelled (inspiration → sélection → contact → proposition → engagement →
 contrat → confirmé → préparation → jour J → archive) but only `inspiration`
 and `selection` are settable for now — reserved states are refused with
-`400`, never simulated. See [`PACTE-MARIAGE.md`](../PACTE-MARIAGE.md) and
+`400`, never simulated. Likewise, the life situations are modelled
+(`mariage`, `naissance`, `deuil`, `reconnexion`, `couple-famille`,
+`transmission`) but only `mariage` is real today: an unknown situation is
+refused with `400` (`Invalid situation`) and a modelled-but-not-real one
+with `situation is not available yet` — nothing is ever invented. See
+[`PACTE-MARIAGE.md`](../PACTE-MARIAGE.md) and
 [`WEDMAG-DOSSIERS.md`](../WEDMAG-DOSSIERS.md).
 
 ### Restore rule (server vs localStorage)

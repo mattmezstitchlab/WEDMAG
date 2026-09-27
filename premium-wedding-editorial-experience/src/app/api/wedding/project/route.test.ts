@@ -100,3 +100,23 @@ test("POST rejects a too-long project name with 400", async () => {
   assert.equal(response.status, 400);
   assert.deepEqual(await response.json(), { error: "name is too long" });
 });
+
+test("POST create answers honestly in local_only with an explicit real situation", async () => {
+  const response = await post({ action: "create", name: "Mon mariage", situation: "mariage" });
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { ok: true, persistence: "local_only" });
+});
+
+test("POST create refuses an unknown situation with 400", async () => {
+  const response = await post({ action: "create", situation: "fitness" });
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { error: "Invalid situation" });
+});
+
+test("POST create refuses a modelled-but-not-real situation with 400 — no project is invented", async () => {
+  for (const situation of ["naissance", "deuil", "reconnexion", "couple-famille", "transmission"]) {
+    const response = await post({ action: "create", situation });
+    assert.equal(response.status, 400, `situation ${situation} must not be creatable yet`);
+    assert.deepEqual(await response.json(), { error: "situation is not available yet" });
+  }
+});
