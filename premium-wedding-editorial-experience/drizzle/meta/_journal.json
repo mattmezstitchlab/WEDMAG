@@ -57,6 +57,13 @@
       "when": 1790550099312,
       "tag": "0007_condemned_domino",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790551660249,
+      "tag": "0008_yielding_tyger_tiger",
+      "breakpoints": true
     }
   ]
 }

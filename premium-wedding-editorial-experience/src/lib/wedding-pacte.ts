@@ -1,4 +1,4 @@
-import { getSubject, weddingMomentOrder, type Subject, type WeddingMoment, type WeddingStatus } from "./wedding-data";
+import { getSubject, isMomentHour, isWeddingMoment, weddingMomentOrder, type Subject, type WeddingMoment, type WeddingStatus } from "./wedding-data";
 import { sortWeddingSelectionsByMoment } from "./wedding-project";
 
 /**
@@ -185,6 +185,11 @@ export type WeddingDossierEntry = {
 export type WeddingProjectState = {
   name: string;
   dossiers: Record<string, WeddingDossierEntry>;
+  /**
+   * C: the couple's own hour overrides (moment → "HH:MM"). Absent moments
+   * fall back to the proposed hours — never deduced, never imposed.
+   */
+  momentHours?: Record<string, string>;
 };
 
 /**
@@ -196,15 +201,16 @@ export type WeddingProjectState = {
 export function normalizeWeddingState(value: unknown): WeddingProjectState | null {
   if (typeof value !== "object" || value === null) return null;
 
-  const { name, items, dossiers } = value as {
+  const { name, items, dossiers, momentHours } = value as {
     name?: unknown;
     items?: unknown;
     dossiers?: unknown;
+    momentHours?: unknown;
   };
 
   if (typeof name !== "string" || !name.trim()) return null;
 
-  const normalized: WeddingProjectState = { name, dossiers: {} };
+  const normalized: WeddingProjectState = { name, dossiers: {}, momentHours: normalizeMomentHours(momentHours) };
 
   const fill = (
     entries:
@@ -250,6 +256,19 @@ export function normalizeWeddingState(value: unknown): WeddingProjectState | nul
  * cannot exist and is dropped — never invented. Unknown statuses fall back
  * to "selectionne"; notes and roles must be strings or vanish.
  */
+/**
+ * Keeps only known moments with a strict HH:MM override — anything else is
+ * dropped, never repaired into a guess.
+ */
+function normalizeMomentHours(value: unknown): Record<string, string> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return {};
+  const hours: Record<string, string> = {};
+  for (const [moment, hour] of Object.entries(value)) {
+    if (isWeddingMoment(moment) && isMomentHour(hour)) hours[moment] = hour;
+  }
+  return hours;
+}
+
 function normalizeDossierContacts(value: unknown): DossierContact[] {
   if (!Array.isArray(value)) return [];
   const contacts: DossierContact[] = [];
@@ -469,6 +488,51 @@ export function buildProjectTimeline(
 }
 
 /**
+ * LA JOURNÉE TYPE (C): the skeleton view. Every canonical moment of every
+ * phase appears — in canonical order — even when nothing is ticked yet:
+ * the couple opens their wedding and the whole day is already drawn.
+ * Subjects land in their moment; unknown-moment dossiers still fall back
+ * to a trailing "À organiser" phase instead of disappearing silently.
+ */
+export function buildWeddingDay(
+  dossiers: readonly Pick<WeddingDossier, "subjectId">[],
+  resolveSubject: (id: string) => Subject | undefined = getSubject,
+): TimelinePhase[] {
+  const selections = dossiers.map((dossier) => ({
+    subjectId: dossier.subjectId,
+    status: "interested" as WeddingStatus,
+  }));
+
+  const groups = sortWeddingSelectionsByMoment(selections, resolveSubject);
+
+  const subjectsByMoment = new Map<WeddingMoment, Subject[]>();
+  const unsorted: TimelineMomentGroup[] = [];
+  for (const group of groups) {
+    if (group.moment === null) {
+      unsorted.push({ moment: null, subjects: group.selections.map((selection) => selection.subject) });
+      continue;
+    }
+    subjectsByMoment.set(group.moment, group.selections.map((selection) => selection.subject));
+  }
+
+  const phases: TimelinePhase[] = weddingPhases.map((phase) => ({
+    key: phase.key,
+    number: phase.number,
+    label: phase.label,
+    momentGroups: phase.moments.map((moment) => ({
+      moment,
+      subjects: subjectsByMoment.get(moment) ?? [],
+    })),
+  }));
+
+  if (unsorted.length > 0) {
+    phases.push({ key: null, number: null, label: "À organiser", momentGroups: unsorted });
+  }
+
+  return phases;
+}
+
+/**
  * Deterministic restore rule for the wedding project, mirroring the
  * selections rule (mergeRestoredProject):
  *
@@ -503,9 +567,14 @@ export function mergeRestoredWedding(
     };
   }
 
+  // Per-moment hour merge: the couple's latest gesture wins, the base
+  // (server snapshot or local mirror) supplies every other moment.
+  const momentHours = { ...(base.momentHours ?? {}), ...(current.momentHours ?? {}) };
+
   return {
     name: current.name || base.name,
     dossiers,
+    momentHours,
   };
 }
 

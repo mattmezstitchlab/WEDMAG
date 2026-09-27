@@ -18,6 +18,43 @@ export const weddingMomentOrder = [
 
 export type WeddingMoment = (typeof weddingMomentOrder)[number];
 
+/**
+ * LA JOURNÉE TYPE — the pre-drawn day. One entry per canonical moment, in
+ * canonical order: the skeleton the couple opens first, with PROPOSED hours
+ * (editorial data, modifiable — the couple decides). `null` marks a period
+ * moment (not a clock moment): WEDMAG invents no time for it.
+ */
+export const weddingDayTemplate: { moment: WeddingMoment; hour: string | null }[] = [
+  { moment: "Avant le mariage", hour: null },
+  { moment: "Veille du mariage", hour: null },
+  { moment: "Préparatifs", hour: "11:00" },
+  { moment: "Cérémonie", hour: "15:00" },
+  { moment: "Cocktail", hour: "18:00" },
+  { moment: "Couple", hour: "18:30" },
+  { moment: "Dîner", hour: "20:30" },
+  { moment: "Première danse", hour: "22:30" },
+  { moment: "Soirée", hour: "23:00" },
+  { moment: "Lendemain", hour: null },
+  { moment: "Brunch", hour: "11:00" },
+  { moment: "Après le mariage", hour: null },
+];
+
+/** Proposed hour per moment — single source: the template above. */
+export const proposedMomentHours = Object.fromEntries(
+  weddingDayTemplate.map((entry) => [entry.moment, entry.hour]),
+) as Record<WeddingMoment, string | null>;
+
+/** A couple-declared hour is a strict HH:MM (24h) string — nothing else. */
+const hourPattern = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+export function isWeddingMoment(value: unknown): value is WeddingMoment {
+  return typeof value === "string" && (weddingMomentOrder as readonly string[]).includes(value);
+}
+
+export function isMomentHour(value: unknown): value is string {
+  return typeof value === "string" && hourPattern.test(value);
+}
+
 export type Subject = {
   id: string;
   coverNumber: number;

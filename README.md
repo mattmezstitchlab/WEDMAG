@@ -95,7 +95,11 @@ transaction, never backwards; `contact-engage` (B2) records the couple's
 declared choice (`proposition → engage`) and moves the dossier to the
 engagement state — still their words, never a contract or a verified
 booking; `contact-remove` removes the person (including a confirmed or
-engaged one) without rewriting the dossier's history. Every declared
+engaged one) without rewriting the dossier's history;
+`moment-hour` (C) sets the couple's own hour for a moment of the
+pre-drawn day ({moment, hour | null} — a strict `HH:MM` or null to
+fall back to the proposed hour; stored as a `moment_hours` jsonb
+override map on the project, GET returns it as `momentHours`). Every declared
 moment carries a persistent timestamp (`attestedAt`, `confirmedAt`,
 `propositionAt`, `engagedAt` — real columns, never a substitute via
 `updatedAt`). See

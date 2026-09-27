@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getSubjectProfessional, subjects } from "./wedding-data";
+import { getSubjectProfessional, isMomentHour, isWeddingMoment, proposedMomentHours, subjects, weddingDayTemplate, weddingMomentOrder } from "./wedding-data";
 
 /**
  * Phase A — CONTACT: the catalogue's professionals are EDITORIAL REFERENCES.
@@ -54,4 +54,24 @@ test("getSubjectProfessional resolves a pair only within the dossier's own subje
   assert.equal(getSubjectProfessional("photographe", ""), undefined);
   // Unknown subject.
   assert.equal(getSubjectProfessional("inexistant", "inexistant:qui"), undefined);
+});
+
+/**
+ * Phase C — LA JOURNÉE TYPE: the pre-drawn day. The template must cover
+ * every canonical moment exactly once, in canonical order, with proposed
+ * hours that are either a strict HH:MM or null (a period moment — WEDMAG
+ * invents no time for it).
+ */
+test("the journée type template covers every canonical moment once, in order", () => {
+  assert.deepEqual(weddingDayTemplate.map((entry) => entry.moment), [...weddingMomentOrder]);
+  for (const entry of weddingDayTemplate) {
+    assert.ok(entry.hour === null || isMomentHour(entry.hour), `invalid hour for ${entry.moment}`);
+    assert.equal(proposedMomentHours[entry.moment], entry.hour);
+  }
+  // The guards used by validation recognize exactly the template's world.
+  assert.equal(isWeddingMoment("Cérémonie"), true);
+  assert.equal(isWeddingMoment("Bogus"), false);
+  assert.equal(isMomentHour("15:00"), true);
+  assert.equal(isMomentHour("25:00"), false);
+  assert.equal(isMomentHour("9h"), false);
 });

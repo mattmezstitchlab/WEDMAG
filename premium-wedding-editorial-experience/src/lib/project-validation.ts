@@ -1,4 +1,4 @@
-import { getSubjectProfessional } from "./wedding-data";
+import { getSubjectProfessional, isMomentHour, isWeddingMoment } from "./wedding-data";
 import { validateSubjectId } from "./selection-validation";
 import {
   isDossierState,
@@ -49,7 +49,8 @@ export type ProjectRequest =
   | { action: "contact-confirm"; subjectId: string; contactId: string; note: string | null }
   | { action: "contact-proposition"; subjectId: string; contactId: string; note: string | null }
   | { action: "contact-engage"; subjectId: string; contactId: string; note: string | null }
-  | { action: "contact-remove"; subjectId: string; contactId: string };
+  | { action: "contact-remove"; subjectId: string; contactId: string }
+  | { action: "moment-hour"; moment: string; hour: string | null };
 
 export type ProjectRequestParse =
   | { ok: true; request: ProjectRequest }
@@ -60,7 +61,7 @@ export function parseProjectRequest(body: unknown): ProjectRequestParse {
     return { ok: false, error: "Invalid request body" };
   }
 
-  const { action, name, situation, subjectId, state, professionalRef, role, contactId, note } = body as {
+  const { action, name, situation, subjectId, state, professionalRef, role, contactId, note, moment, hour } = body as {
     action?: unknown;
     name?: unknown;
     situation?: unknown;
@@ -70,6 +71,8 @@ export function parseProjectRequest(body: unknown): ProjectRequestParse {
     role?: unknown;
     contactId?: unknown;
     note?: unknown;
+    moment?: unknown;
+    hour?: unknown;
   };
 
   if (action === "create") {
@@ -245,6 +248,25 @@ export function parseProjectRequest(body: unknown): ProjectRequestParse {
     }
 
     return { ok: true, request: { action: "contact-remove", subjectId: check.subjectId, contactId: trimmedContactId } };
+  }
+
+  if (action === "moment-hour") {
+    // C: the couple sets THEIR hour for a moment of the day — or clears it
+    // (null = back to the proposed hour). A strict HH:MM or nothing.
+    if (!isWeddingMoment(moment)) {
+      return { ok: false, error: "Unknown moment" };
+    }
+    if (hour !== undefined && hour !== null && typeof hour !== "string") {
+      return { ok: false, error: "Invalid hour" };
+    }
+    const value = typeof hour === "string" ? hour.trim() : "";
+    if (value.length === 0) {
+      return { ok: true, request: { action: "moment-hour", moment, hour: null } };
+    }
+    if (!isMomentHour(value)) {
+      return { ok: false, error: "Invalid hour" };
+    }
+    return { ok: true, request: { action: "moment-hour", moment, hour: value } };
   }
 
   return { ok: false, error: "Invalid action" };

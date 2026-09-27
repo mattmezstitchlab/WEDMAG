@@ -1189,3 +1189,14 @@ Décision produit : le squelette est prédéfini, le contenu reste libre.
    personnes déclarées. Le tiroir vide montre la journée type en aperçu.
 6. Intouchés : moteur timeline, parcours, contacts, PACTE, homepage.
    Hors périmètre : heures imposées, durée, lieux, coordination automatique.
+
+### Phase C — vérifications (toutes vertes)
+
+- 128/128 tests (124 + journée type : template/ordre/heures, squelette
+  buildWeddingDay, normalisation momentHours, validation moment-hour),
+  lint, typecheck, build.
+- PostgreSQL 18.4 réel : migration 0008 appliquée (jsonb, aucun backfill) ;
+  moment-hour 16:30/18:00 persistés et renvoyés par GET ; reset null OK ;
+  rejets 25:00 / « 9h » / moment inconnu / heure non-string.
+- UI servie : chaînes « LA JOURNÉE TYPE » / « VOTRE JOURNÉE — LES HEURES
+  SONT À VOUS » présentes dans le bundle, style moment-hour servi.

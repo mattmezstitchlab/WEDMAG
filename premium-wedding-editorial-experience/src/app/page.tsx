@@ -7,14 +7,16 @@ import {
   publishedCoverCount,
   subjects,
   universes,
+  weddingDayTemplate,
   weddingMomentOrder,
+  proposedMomentHours,
   type Subject,
   type WeddingStatus,
 } from "@/lib/wedding-data";
 import { mergeRestoredProject, sortWeddingSelectionsByMoment } from "@/lib/wedding-project";
 import {
   buildDossierParcours,
-  buildProjectTimeline,
+  buildWeddingDay,
   weddingPhases,
   contactStatusLabels,
   dossierStateLabels,
@@ -130,6 +132,7 @@ export default function HomePage() {
           const payload = (await response.json()) as {
             project?: {
               name: string;
+              momentHours?: Record<string, string>;
               dossiers: {
                 id: string;
                 subjectId: string;
@@ -154,6 +157,7 @@ export default function HomePage() {
           if (payload.project) {
             serverWedding = {
               name: payload.project.name,
+              momentHours: payload.project.momentHours ?? {},
               dossiers: Object.fromEntries(
                 payload.project.dossiers.map((dossier) => [
                   dossier.subjectId,
@@ -624,6 +628,19 @@ export default function HomePage() {
     syncWedding({ action: "parcours-step", subjectId });
   };
 
+  // C: the couple sets their hour for a moment — or clears it (back to the
+  // proposed hour). Their declaration, never a computed value.
+  const setMomentHour = (moment: string, hour: string) => {
+    setWedding((current) => {
+      if (!current) return current;
+      const next = { ...(current.momentHours ?? {}) };
+      if (hour) next[moment] = hour;
+      else delete next[moment];
+      return { ...current, momentHours: next };
+    });
+    syncWedding({ action: "moment-hour", moment, hour: hour || null });
+  };
+
   const setDossierState = (subjectId: string, state: DossierState) => {
     setWedding((current) => {
       if (!current || !current.dossiers[subjectId]) return current;
@@ -661,7 +678,9 @@ export default function HomePage() {
     [wedding],
   );
 
-  const timeline = useMemo(() => buildProjectTimeline(attachedDossiers), [attachedDossiers]);
+  // C: the whole pre-drawn day — every canonical moment visible, even
+  // empty. The couple opens MON MARIAGE and the day is already there.
+  const timeline = useMemo(() => buildWeddingDay(attachedDossiers), [attachedDossiers]);
 
   const unattachedSelections = useMemo(
     () =>
@@ -933,8 +952,8 @@ export default function HomePage() {
             {wedding ? (
               <div className="project-content">
                 <section className="project-section">
-                  <div className="section-with-note"><p className="block-title">LES DOSSIERS DE VOTRE MARIAGE</p><span>LA TIMELINE</span></div>
-                  {attachedCount === 0 && <p className="timeline-hint">Cochez une couverture dans le magazine : son dossier prendra sa place dans le fil de votre journée.</p>}
+                  <div className="section-with-note"><p className="block-title">VOTRE JOURNÉE</p><span>LES HEURES SONT À VOUS</span></div>
+                  {attachedCount === 0 && <p className="timeline-hint">Votre journée est déjà dessinée. Cochez dans le magazine : chaque choix prend sa place.</p>}
                   <div className="project-selections">
                     {timeline.map((phase) => (
                       <div className="timeline-phase" key={phase.key ?? "other"}>
@@ -949,7 +968,17 @@ export default function HomePage() {
                             <div className="moment-heading">
                               <b>{group.moment ? String(weddingMomentOrder.indexOf(group.moment) + 1).padStart(2, "0") : "—"}</b>
                               <h3>{group.moment ?? "À organiser"}</h3>
+                              {group.moment && proposedMomentHours[group.moment] !== null && (
+                                <input
+                                  className="moment-hour"
+                                  type="time"
+                                  value={(wedding.momentHours ?? {})[group.moment] ?? proposedMomentHours[group.moment] ?? ""}
+                                  onChange={(event) => setMomentHour(group.moment as string, event.target.value)}
+                                  aria-label={`Heure de ${group.moment}`}
+                                />
+                              )}
                             </div>
+                            {group.subjects.length === 0 && <p className="moment-empty">à garnir</p>}
                             {group.subjects.map((subject) => {
                               const dossier = wedding.dossiers[subject.id];
                               return (
@@ -973,6 +1002,21 @@ export default function HomePage() {
                                 </article>
                               );
                             })}
+                          {(() => {
+                            // The moment's real people — declared in the
+                            // dossiers ticked for this moment (B1/B2 chain).
+                            const declared = group.subjects.flatMap((subject) =>
+                              (wedding.dossiers[subject.id]?.contacts ?? [])
+                                .filter((contact) => contact.status !== "selectionne")
+                                .map((contact) => {
+                                  const professional = contact.professionalRef
+                                    ? subject.professionals.find((candidate) => `${subject.id}:${candidate.id}` === contact.professionalRef)
+                                    : undefined;
+                                  return `${professional?.name ?? contact.declaredName ?? "Personne rencontrée"} · ${contactStatusLabels[contact.status]}`;
+                                }),
+                            );
+                            return declared.length > 0 ? <p className="moment-people">AVEC : {declared.join(" — ")}</p> : null;
+                          })()}
                           </div>
                         ))}
                       </div>
@@ -1034,6 +1078,15 @@ export default function HomePage() {
                 <p>Votre mariage commence ici.</p>
                 <span>Cochez une première couverture : votre mariage se crée tout seul, chaque choix devient un dossier.</span>
                 <button className="button button-fuchsia" onClick={() => { setDrawerOpen(false); scrollToMagazine(); }}>FEUILLETER <span>↓</span></button>
+                <div className="day-preview">
+                  <p className="block-title">LA JOURNÉE TYPE</p>
+                  <ul>
+                    {weddingDayTemplate.filter((entry) => entry.hour).map((entry) => (
+                      <li key={entry.moment}><b>{entry.hour}</b><span>{entry.moment}</span></li>
+                    ))}
+                  </ul>
+                  <span>Déjà dessinée. À vous de cocher, régler les heures, déclarer vos prestataires.</span>
+                </div>
               </div>
             ) : (
               <div className="project-content">

@@ -39,6 +39,8 @@ type StoredProject = {
   name: string;
   situation: string;
   dossiers: StoredDossier[];
+  /** C: the couple's hour overrides (moment → "HH:MM"); {} = all proposed. */
+  momentHours: Record<string, string>;
 };
 
 async function loadProject(db: ReturnType<typeof getDb>, sessionId: string): Promise<StoredProject | null> {
@@ -47,6 +49,7 @@ async function loadProject(db: ReturnType<typeof getDb>, sessionId: string): Pro
       id: weddingProjects.id,
       name: weddingProjects.name,
       situation: weddingProjects.situation,
+      momentHours: weddingProjects.momentHours,
     })
     .from(weddingProjects)
     .where(eq(weddingProjects.sessionId, sessionId))
@@ -113,7 +116,13 @@ async function loadProject(db: ReturnType<typeof getDb>, sessionId: string): Pro
     contacts: contactsByDossier.get(dossier.id) ?? [],
   }));
 
-  return { id: project.id, name: project.name, situation: project.situation, dossiers };
+  return {
+    id: project.id,
+    name: project.name,
+    situation: project.situation,
+    dossiers,
+    momentHours: (project.momentHours ?? {}) as Record<string, string>,
+  };
 }
 
 /**
@@ -504,6 +513,17 @@ export async function POST(request: Request) {
         if (removed.length === 0) {
           return NextResponse.json({ error: "Unknown contact" }, { status: 400 });
         }
+      } else if (action.action === "moment-hour") {
+        // C: the couple sets THEIR hour for a moment of the day — or clears
+        // it (null = back to the proposed hour). Their declaration, stored
+        // as an override; nothing is ever deduced or imposed.
+        const next = { ...(project.momentHours ?? {}) };
+        if (action.hour === null) delete next[action.moment];
+        else next[action.moment] = action.hour;
+        await db
+          .update(weddingProjects)
+          .set({ momentHours: next, updatedAt: sql`now()` })
+          .where(eq(weddingProjects.id, project.id));
       } else if (action.action === "set-state") {
         // returning() tells us whether the dossier actually existed — a
         // set-state on a subject with no dossier must not answer ok:true.

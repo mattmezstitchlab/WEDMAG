@@ -309,3 +309,32 @@ test("rejects non-object bodies", () => {
     assert.equal(result.error, "Invalid request body");
   }
 });
+
+/**
+ * Phase C — moment-hour: the couple sets their hour for a moment of the
+ * day, or clears it (null = back to the proposed hour). Strict HH:MM.
+ */
+test("moment-hour accepts a strict HH:MM, trims it, and accepts null as a reset", () => {
+  assert.deepEqual(parse({ action: "moment-hour", moment: "Cérémonie", hour: "  16:30  " }), {
+    ok: true,
+    request: { action: "moment-hour", moment: "Cérémonie", hour: "16:30" },
+  });
+  assert.deepEqual(parse({ action: "moment-hour", moment: "Cérémonie", hour: null }), {
+    ok: true,
+    request: { action: "moment-hour", moment: "Cérémonie", hour: null },
+  });
+  assert.deepEqual(parse({ action: "moment-hour", moment: "Cérémonie" }), {
+    ok: true,
+    request: { action: "moment-hour", moment: "Cérémonie", hour: null },
+  });
+  for (const [label, body, error] of [
+    ["with an impossible hour", { action: "moment-hour", moment: "Cérémonie", hour: "25:00" }, "Invalid hour"],
+    ["with a loose hour", { action: "moment-hour", moment: "Cérémonie", hour: "9h" }, "Invalid hour"],
+    ["with an unknown moment", { action: "moment-hour", moment: "Bogus", hour: "10:00" }, "Unknown moment"],
+    ["with a non-string hour", { action: "moment-hour", moment: "Cérémonie", hour: 42 }, "Invalid hour"],
+  ] as const) {
+    const result = parse(body);
+    assert.equal(result.ok, false, label);
+    assert.equal(result.error, error);
+  }
+});

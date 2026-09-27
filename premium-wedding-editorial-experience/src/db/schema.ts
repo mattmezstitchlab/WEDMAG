@@ -1,4 +1,4 @@
-import { index, integer, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 /**
@@ -40,6 +40,12 @@ export const weddingProjects = pgTable(
      * content exists for them.
      */
     situation: text("situation").notNull().default("mariage"),
+    /**
+     * C: the couple's own hour overrides for the day's moments
+     * (moment → "HH:MM"). Absent moments fall back to the proposed hours —
+     * an unknown fact stays unknown, nothing is ever deduced.
+     */
+    momentHours: jsonb("moment_hours").$type<Record<string, string>>().notNull().default({}),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

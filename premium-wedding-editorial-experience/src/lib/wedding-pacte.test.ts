@@ -3,6 +3,7 @@ import test from "node:test";
 import { getSubject, subjects, weddingMomentOrder, type Subject } from "./wedding-data";
 import {
   buildDossierParcours,
+  buildWeddingDay,
   buildProjectTimeline,
   dossierStateLabels,
   dossierStates,
@@ -33,7 +34,8 @@ const dossier = (subjectId: string, state: WeddingDossier["state"] = "selection"
 const project = (
   name: string,
   dossiers: WeddingProjectState["dossiers"],
-): WeddingProjectState => ({ name, dossiers });
+  momentHours: Record<string, string> = {},
+): WeddingProjectState => ({ name, dossiers, momentHours });
 
 function fixture(overrides: Partial<Subject> & Pick<Subject, "id" | "title" | "moments">): Subject {
   return {
@@ -468,4 +470,42 @@ test("normalizeWeddingState repairs an invalid parcours progress", () => {
     traiteur: entry(null),
     plage: entry(null),
   }));
+});
+
+/**
+ * Phase C — LA JOURNÉE TYPE: buildWeddingDay draws the whole skeleton.
+ * Every canonical moment of every phase appears, in canonical order, even
+ * when nothing is ticked; subjects land in their moment; unknown-moment
+ * dossiers still fall back to "À organiser".
+ */
+test("buildWeddingDay draws the whole skeleton — every moment visible, subjects placed", () => {
+  const day = buildWeddingDay([dossier("saxophoniste"), dossier("brunch")]);
+
+  const jour = day.find((phase) => phase.key === "jour");
+  assert.ok(jour);
+  assert.deepEqual(jour.momentGroups.map((group) => group.moment), ["Cérémonie", "Cocktail", "Couple", "Dîner", "Première danse", "Soirée"]);
+  assert.deepEqual(jour.momentGroups[0].subjects.map((subject) => subject.id), ["saxophoniste"]);
+  assert.deepEqual(jour.momentGroups[1].subjects, []);
+
+  const avant = day.find((phase) => phase.key === "avant");
+  assert.ok(avant);
+  assert.deepEqual(avant.momentGroups.map((group) => group.moment), ["Avant le mariage", "Veille du mariage", "Préparatifs"]);
+  assert.deepEqual(avant.momentGroups.every((group) => group.subjects.length === 0), true);
+
+  const apres = day.find((phase) => phase.key === "apres");
+  assert.ok(apres);
+  assert.deepEqual(apres.momentGroups.map((group) => group.moment), ["Lendemain", "Brunch", "Après le mariage"]);
+  assert.deepEqual(apres.momentGroups[0].subjects.map((subject) => subject.id), ["brunch"]);
+});
+
+test("normalizeWeddingState keeps only known moments with strict HH:MM hour overrides", () => {
+  const normalized = normalizeWeddingState({
+    name: "Mon mariage",
+    dossiers: {},
+    momentHours: { Cérémonie: "16:00", Bogus: "10:00", Cocktail: "25:00", Dîner: 42 },
+  });
+  assert.deepEqual(normalized?.momentHours, { "Cérémonie": "16:00" });
+
+  const without = normalizeWeddingState({ name: "Mon mariage", dossiers: {} });
+  assert.deepEqual(without?.momentHours, {});
 });
