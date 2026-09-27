@@ -86,6 +86,22 @@ test("set-state validates the subjectId against the catalogue", () => {
   assert.equal(result.error, "Unknown subjectId");
 });
 
+test("parcours-step validates the subjectId against the catalogue", () => {
+  assert.deepEqual(parse({ action: "parcours-step", subjectId: "dj" }), {
+    ok: true,
+    request: { action: "parcours-step", subjectId: "dj" },
+  });
+  const result = parse({ action: "parcours-step", subjectId: "album" });
+  assert.equal(result.ok, false);
+  assert.equal(result.error, "Unknown subjectId");
+});
+
+test("parcours-step rejects a missing subjectId", () => {
+  const result = parse({ action: "parcours-step" });
+  assert.equal(result.ok, false);
+  assert.equal(result.error, "subjectId is required");
+});
+
 test("rejects unknown or missing actions", () => {
   for (const body of [{}, { action: "delete" }, { action: 42 }, { subjectId: "dj" }]) {
     const result = parse(body);

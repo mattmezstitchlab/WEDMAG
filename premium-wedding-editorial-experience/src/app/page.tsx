@@ -14,6 +14,7 @@ import {
 } from "@/lib/wedding-data";
 import { mergeRestoredProject, sortWeddingSelectionsByMoment } from "@/lib/wedding-project";
 import {
+  buildDossierParcours,
   buildProjectTimeline,
   dossierStateLabels,
   mergeRestoredWedding,
@@ -149,7 +150,7 @@ export default function HomePage() {
         const response = await fetch("/api/wedding/project");
         if (response.ok) {
           const payload = (await response.json()) as {
-            project?: { name: string; dossiers: { id: string; subjectId: string; state: string; source: string }[] } | null;
+            project?: { name: string; dossiers: { id: string; subjectId: string; state: string; source: string; parcoursProgress: number }[] } | null;
             persistence?: string;
           };
           weddingPersistence = payload.persistence;
@@ -163,6 +164,7 @@ export default function HomePage() {
                     id: typeof dossier.id === "string" ? dossier.id : null,
                     state: dossier.state as DossierState,
                     source: dossier.source,
+                    parcoursProgress: typeof dossier.parcoursProgress === "number" ? dossier.parcoursProgress : 0,
                   },
                 ]),
               ),
@@ -251,11 +253,14 @@ export default function HomePage() {
     if (wedding && !wedding.dossiers[subject.id]) {
       setWedding((current) =>
         current
-          ? { ...current, dossiers: { ...current.dossiers, [subject.id]: { id: null, state: "selection", source: "wedmag" } } }
+          ? { ...current, dossiers: { ...current.dossiers, [subject.id]: { id: null, state: "selection", source: "wedmag", parcoursProgress: 0 } } }
           : current,
       );
       syncWedding({ action: "attach", subjectId: subject.id });
-      setToast(`Le dossier ${subject.title} est ouvert dans votre mariage.`);
+      // Editorial transition: the fresh dossier opens on its parcours —
+      // the couple immediately sees what this choice has become.
+      setActiveDossier(subject);
+      setToast(`Le dossier ${subject.title} est créé. Nous avons préparé un parcours pour vous.`);
       return;
     }
     setToast(`${subject.title} rejoint votre mariage.`);
@@ -302,7 +307,7 @@ export default function HomePage() {
     const label = getSubject(subjectId)?.title ?? "Cette inspiration";
     setWedding((current) =>
       current
-        ? { ...current, dossiers: { ...current.dossiers, [subjectId]: { id: null, state: "selection", source: "wedmag" } } }
+        ? { ...current, dossiers: { ...current.dossiers, [subjectId]: { id: null, state: "selection", source: "wedmag", parcoursProgress: 0 } } }
         : current,
     );
     syncWedding({ action: "attach", subjectId });
@@ -319,6 +324,26 @@ export default function HomePage() {
     });
     syncWedding({ action: "detach", subjectId });
     setToast(`Le dossier ${label} retourne parmi vos inspirations.`);
+  };
+
+  const validateParcoursStep = (subjectId: string) => {
+    setWedding((current) => {
+      if (!current) return current;
+      const dossier = current.dossiers[subjectId];
+      if (!dossier) return current;
+      const subject = getSubject(subjectId);
+      if (!subject) return current;
+      const total = buildDossierParcours(subject).steps.length;
+      if (dossier.parcoursProgress >= total) return current;
+      return {
+        ...current,
+        dossiers: {
+          ...current.dossiers,
+          [subjectId]: { ...dossier, parcoursProgress: dossier.parcoursProgress + 1 },
+        },
+      };
+    });
+    syncWedding({ action: "parcours-step", subjectId });
   };
 
   const setDossierState = (subjectId: string, state: DossierState) => {
@@ -792,6 +817,45 @@ export default function HomePage() {
                   ))}
                 </div>
               </div>
+
+              {(() => {
+                const entry = wedding.dossiers[activeDossier.id];
+                const parcours = buildDossierParcours(activeDossier);
+                const progress = Math.min(entry?.parcoursProgress ?? 0, parcours.steps.length);
+                const complete = progress >= parcours.steps.length;
+                return (
+                  <div className="editorial-block dossier-parcours">
+                    <div className="section-with-note"><p className="block-title">VOTRE PARCOURS</p><span>{progress}/{parcours.steps.length}</span></div>
+                    {progress === 0 && (
+                      <p className="parcours-transition">Votre dossier est créé. Nous avons préparé un parcours pour vous.</p>
+                    )}
+                    <p className="parcours-lede">{parcours.lede}</p>
+                    <ol className="parcours-steps">
+                      {parcours.steps.map((step, index) => {
+                        const done = index < progress;
+                        const current = index === progress;
+                        return (
+                          <li key={step.title} className={done ? "parcours-done" : current ? "parcours-current" : ""}>
+                            <b>{done ? "✓" : current ? "→" : "○"}</b>
+                            <div>
+                              <p>{step.title}</p>
+                              {step.detail && <span>{step.detail}</span>}
+                              {current && !complete && <em>maintenant</em>}
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ol>
+                    {!complete ? (
+                      <button className="add-wide" onClick={() => validateParcoursStep(activeDossier.id)}>
+                        {progress === 0 ? "COMMENCER LE PARCOURS" : "VALIDER CETTE ÉTAPE"}
+                      </button>
+                    ) : (
+                      <p className="parcours-complete">Vous avez parcouru ces {parcours.steps.length} étapes. Ce dossier est prêt pour la suite.</p>
+                    )}
+                  </div>
+                );
+              })()}
 
               <p className="dossier-next">Ce dossier pourra bientôt accueillir votre prestataire, votre contrat, vos documents et vos échéances — chaque couche n’arrivera que lorsqu’elle sera réellement nécessaire.</p>
 

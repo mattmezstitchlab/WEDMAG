@@ -4,13 +4,21 @@ import { NextResponse } from "next/server";
 import { getDb, isDatabaseConfigured } from "@/db";
 import { weddingDossiers, weddingProjects } from "@/db/schema";
 import { parseProjectRequest } from "@/lib/project-validation";
+import { buildDossierParcours } from "@/lib/wedding-pacte";
+import { getSubject } from "@/lib/wedding-data";
 
 export const dynamic = "force-dynamic";
 
 // Same anonymous session as the selections: one identity, one cookie.
 const cookieName = "wwm-project";
 
-type StoredDossier = { id: string; subjectId: string; state: string; source: string };
+type StoredDossier = {
+  id: string;
+  subjectId: string;
+  state: string;
+  source: string;
+  parcoursProgress: number;
+};
 
 type StoredProject = {
   id: string;
@@ -33,6 +41,7 @@ async function loadProject(db: ReturnType<typeof getDb>, sessionId: string): Pro
       subjectId: weddingDossiers.subjectId,
       state: weddingDossiers.state,
       source: weddingDossiers.source,
+      parcoursProgress: weddingDossiers.parcoursProgress,
     })
     .from(weddingDossiers)
     .where(eq(weddingDossiers.projectId, project.id))
@@ -123,6 +132,40 @@ export async function POST(request: Request) {
           .insert(weddingDossiers)
           .values({ projectId: project.id, subjectId: action.subjectId, state: "selection", source: "wedmag" })
           .onConflictDoNothing();
+      } else if (action.action === "parcours-step") {
+        // Validates the NEXT parcours step (sequential, human-validated).
+        // The bound comes from the same derivation the client uses — one
+        // source of truth for the arc — and returning() keeps the answer
+        // honest when the dossier does not exist or is already complete.
+        const [dossier] = await db
+          .select({ id: weddingDossiers.id, parcoursProgress: weddingDossiers.parcoursProgress })
+          .from(weddingDossiers)
+          .where(
+            and(
+              eq(weddingDossiers.projectId, project.id),
+              eq(weddingDossiers.subjectId, action.subjectId),
+            ),
+          )
+          .limit(1);
+
+        if (!dossier) {
+          return NextResponse.json({ error: "No dossier for this subject" }, { status: 400 });
+        }
+
+        const subject = getSubject(action.subjectId);
+        if (!subject) {
+          return NextResponse.json({ error: "Unknown subjectId" }, { status: 400 });
+        }
+
+        const steps = buildDossierParcours(subject).steps;
+        if (dossier.parcoursProgress >= steps.length) {
+          return NextResponse.json({ error: "Parcours already complete" }, { status: 400 });
+        }
+
+        await db
+          .update(weddingDossiers)
+          .set({ parcoursProgress: dossier.parcoursProgress + 1, updatedAt: sql`now()` })
+          .where(eq(weddingDossiers.id, dossier.id));
       } else if (action.action === "set-state") {
         // returning() tells us whether the dossier actually existed — a
         // set-state on a subject with no dossier must not answer ok:true.

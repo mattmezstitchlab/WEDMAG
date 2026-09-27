@@ -19,7 +19,8 @@ export type ProjectRequest =
   | { action: "create"; name: string }
   | { action: "attach"; subjectId: string }
   | { action: "detach"; subjectId: string }
-  | { action: "set-state"; subjectId: string; state: string };
+  | { action: "set-state"; subjectId: string; state: string }
+  | { action: "parcours-step"; subjectId: string };
 
 export type ProjectRequestParse =
   | { ok: true; request: ProjectRequest }
@@ -51,7 +52,7 @@ export function parseProjectRequest(body: unknown): ProjectRequestParse {
     return { ok: true, request: { action: "create", name: trimmed || defaultProjectName } };
   }
 
-  if (action === "attach" || action === "detach" || action === "set-state") {
+  if (action === "attach" || action === "detach" || action === "set-state" || action === "parcours-step") {
     const check = validateSubjectId(subjectId);
 
     if (!check.ok) {

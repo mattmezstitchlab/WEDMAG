@@ -64,6 +64,7 @@ export type WeddingDossier = {
    * contrat, documents, paiements) will reference.
    */
   id: string | null;
+  parcoursProgress?: number;
 };
 
 /** One dossier entry in the client wedding state. */
@@ -71,6 +72,8 @@ export type WeddingDossierEntry = {
   id: string | null;
   state: DossierState;
   source: string;
+  /** Parcours steps validated by the couple (0 = not started). */
+  parcoursProgress: number;
 };
 
 /** Client shape of the wedding project (server rows flattened to a map). */
@@ -98,13 +101,24 @@ export function normalizeWeddingState(value: unknown): WeddingProjectState | nul
 
   const normalized: WeddingProjectState = { name, dossiers: {} };
 
-  const fill = (entries: Record<string, { id?: unknown; state?: unknown; source?: unknown }> | null | undefined) => {
+  const fill = (
+    entries:
+      | Record<string, { id?: unknown; state?: unknown; source?: unknown; parcoursProgress?: unknown }>
+      | null
+      | undefined,
+  ) => {
     if (typeof entries !== "object" || entries === null) return;
     for (const [subjectId, entry] of Object.entries(entries)) {
       normalized.dossiers[subjectId] = {
         id: typeof entry?.id === "string" && entry.id.length > 0 ? entry.id : null,
         state: isDossierState(entry?.state) ? entry.state : "selection",
         source: typeof entry?.source === "string" ? entry.source : "wedmag",
+        parcoursProgress:
+          typeof entry?.parcoursProgress === "number" &&
+          Number.isInteger(entry.parcoursProgress) &&
+          entry.parcoursProgress >= 0
+            ? entry.parcoursProgress
+            : 0,
       };
     }
   };
@@ -166,6 +180,80 @@ const phaseByMoment = new Map<WeddingMoment, WeddingPhaseKey>(
     phase.moments.map((moment) => [moment, phase.key] as const),
   ),
 );
+
+// --- Parcours: the accompaniment layer (DOSSIER → PARCOURS PERSONNALISÉ) ---
+
+/** One recommended step. `detail` comes from real catalogue data — null when
+ * the subject carries none (a unknown fact stays unknown, never invented). */
+export type ParcoursStep = {
+  title: string;
+  detail: string | null;
+};
+
+/** The parcours deduced from a dossier's source subject (never a menu of
+ * formations: it exists only through the dossier that reveals it). */
+export type DossierParcours = {
+  lede: string;
+  steps: ParcoursStep[];
+};
+
+const joinItems = (items: readonly string[], max: number) =>
+  items.length > 0 ? items.slice(0, max).join(" · ") : null;
+
+/**
+ * Derives the contextual parcours from a catalogue subject. The arc varies
+ * with the subject's type (Métier, Lieu, Objet, Service, Expérience) and
+ * every step detail is nourished by the subject's REAL fields (brings,
+ * toPlan, style, professionals, constraints, moments). Pure and shared by
+ * client and server — the single source of truth for the arc.
+ */
+export function buildDossierParcours(subject: Subject): DossierParcours {
+  const steps: ParcoursStep[] = [];
+
+  steps.push({
+    title: "Définir vos attentes",
+    detail: joinItems(subject.brings, 2) ?? subject.intro,
+  });
+
+  steps.push({
+    title: "Construire votre cadrage",
+    detail: joinItems(subject.toPlan, 3),
+  });
+
+  if (subject.type === "Métier") {
+    steps.push({
+      title: "Identifier ce qui vous correspond",
+      detail: subject.style ? `Côté ${subject.style}` : null,
+    });
+    steps.push({
+      title: `Sélectionner des ${subject.title.toLowerCase()}s`,
+      detail: joinItems(subject.professionals.map((pro) => pro.name), 2),
+    });
+  } else if (subject.type === "Lieu") {
+    steps.push({ title: "Explorer les lieux", detail: joinItems(subject.resources, 2) });
+    steps.push({ title: "Visiter et comparer", detail: null });
+  } else if (subject.type === "Objet") {
+    steps.push({ title: "Explorer les créations", detail: joinItems(subject.services.slice(0, 2), 2) });
+    steps.push({ title: "Essayer, ajuster", detail: null });
+  } else if (subject.type === "Expérience") {
+    steps.push({ title: "Construire le déroulé", detail: joinItems(subject.services.slice(0, 2), 2) });
+  } else {
+    steps.push({ title: "Comparer les options", detail: joinItems(subject.services.slice(0, 2), 2) });
+  }
+
+  steps.push({ title: "Comparer les propositions", detail: null });
+  steps.push({
+    title: "Vérifier les disponibilités",
+    detail: joinItems(subject.constraints, 2),
+  });
+  steps.push({ title: "Examiner l’engagement", detail: null });
+  steps.push({ title: "Préparer le jour J", detail: joinItems(subject.moments, 3) });
+
+  return {
+    lede: `${steps.length} étapes pour passer de l’inspiration à une organisation prête pour le jour J.`,
+    steps,
+  };
+}
 
 /**
  * Builds the project timeline from the wedding's dossiers, reusing the

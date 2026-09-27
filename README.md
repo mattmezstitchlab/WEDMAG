@@ -56,7 +56,9 @@ The app degrades on purpose:
 The PACTE marriage layer adds `GET` / `POST /api/wedding/project` with the
 same rules: `create` (idempotent, one project per session, optional name),
 `attach` (opens the subject's **dossier**, initial state `selection`) /
-`detach`, and `set-state` (dossier state). The dossier lifecycle is fully
+`detach`, `set-state` (dossier state) and `parcours-step` (validates the
+next step of the dossier's recommended parcours — the arc is derived from
+the catalogue subject, progress is a simple counter on the dossier). The dossier lifecycle is fully
 modelled (inspiration → sélection → contact → proposition → engagement →
 contrat → confirmé → préparation → jour J → archive) but only `inspiration`
 and `selection` are settable for now — reserved states are refused with

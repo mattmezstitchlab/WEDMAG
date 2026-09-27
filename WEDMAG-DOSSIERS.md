@@ -209,3 +209,107 @@ l'ancre métier pour toutes ces couches futures (elles référenceront
 - Vérification visuelle mobile impossible dans cet environnement (pas de
   navigateur) — **limitation documentée**, revue CSS statique des
   breakpoints uniquement.
+
+---
+
+# PHASE — DOSSIER → PARCOURS PERSONNALISÉ
+
+**Date :** 27 septembre 2026 · **Base :** commit `4128a40` (Phases 1 et 1.1 validées)
+**Objectif :** la première preuve tangible de `COUVERTURE → DOSSIER → PARCOURS CONTEXTUEL`.
+**Statut :** **implémentée et vérifiée** (parcours dérivé du sujet, transition éditoriale à
+la création du dossier, progression persistée 0→8 avec borne serveur, isolation
+des mariages, 94/94 tests, runtime PostgreSQL, chemin 503).
+
+## EXISTANT (audit)
+
+| Élément | État |
+|---|---|
+| Dossiers | `wedding_dossiers` (id uuid, project_id, subject_id, state, source, created/updated) — le dossier référence son sujet catalogue, jamais une copie |
+| Catalogue | 36 sujets portant des données réelles utilisables pour déduire un parcours : `type` (Métier/Lieu/Expérience/Service/Objet), `style`, `brings`, `toPlan`, `constraints`, `moments`, `professionals` |
+| Timeline | 3 phases AVANT / LE JOUR / APRÈS, moteur chronologique unique — les dossiers y sont affichés |
+| Navigation | couverture ↔ fiche sujet ↔ dossier ↔ drawer (Phase 1.1), clé = dossier.id |
+| États | dossier : inspiration/selection actifs, 8 états réservés refusés en 400 |
+| Persistance | POST `/api/wedding/project` (create/attach/detach/set-state), GET honnête (local_only/server/unavailable), validation stricte contre le catalogue |
+| Parcours | **N'existe pas** — aucune entité, aucune étape, aucun accompagnement |
+
+## NOUVEAU CONCEPT
+
+La couverture choisie exprime une **intention** ; le dossier est **ce qui existe** ;
+le parcours est **comment le couple avance** — une couche d'accompagnement
+contextuelle, jamais un catalogue de formations :
+
+```
+COUVERTURE → AJOUT → DOSSIER (créé) → « Votre dossier est créé.
+Nous avons préparé un parcours pour vous. » → OUVERTURE DU PARCOURS
+```
+
+Le parcours est **déduit du dossier** (donc de son sujet source) par une
+fonction pure `buildDossierParcours(subject)` : l'arc éditorial (7 à 8 étapes)
+varie selon le `type` du sujet (Métier, Lieu, Objet, Service, Expérience) et
+chaque étape est **nourrie par les données réelles du catalogue** (brings,
+toPlan, style, professionals, constraints, moments). Aucune étape n'est
+inventée : détail absent → pas de détail. Une donnée inconnue reste inconnue.
+
+## MODÈLE PROPOSÉ (minimal, sans nouvelle entité)
+
+**Décision : pas de table `parcours` à ce stade.** Le parcours est porté par
+son conteneur :
+
+- **Définition des étapes** : dérivée à l'exécution du sujet catalogue
+  (fonction pure partagée client/serveur — une seule source de vérité, zéro
+  duplication, zéro « deuxième identifiant concurrent »).
+- **Progression** : une colonne `parcours_progress integer DEFAULT 0` sur
+  `wedding_dossiers` = nombre d'étapes validées par le couple. Le parcours
+  est donc **relié au dossier.id par construction** (il vit sur sa ligne).
+- **Statut du parcours** : dérivé (`progress == 0` → à commencer ;
+  `progress < steps.length` → en cours ; `==` → complété). Jamais stocké.
+
+Quand un parcours devra être adressable indépendamment (attestation, programme
+annuel), une table `wedding_parcours(id, dossier_id, type, status…)` sera
+introduite en référençant `dossier_id` — architecture documentée, non figée.
+
+Migration 0003 : `ALTER TABLE wedding_dossiers ADD COLUMN parcours_progress
+integer DEFAULT 0 NOT NULL` — additive, non destructive.
+
+## RELATIONS
+
+```
+MARIAGE (wedding_projects)
+  └── DOSSIER (wedding_dossiers)  ←── référence ── SUJET CATALOGUE (36)
+        └── PARCOURS (couche)  = étapes dérivées du sujet + progression (colonne)
+              └── chaque validation d'étape = action utilisateur persistée
+```
+
+Le parcours ne **duplique rien** du dossier ni du sujet ; il ne crée **aucune
+échéance** (les étapes pourront plus tard en générer — hors périmètre).
+
+## DONNÉES
+
+- `wedding_dossiers.parcours_progress` (int, 0 → steps.length, contrôlé
+  serveur via la même fonction de dérivation).
+- API : `POST /api/wedding/project` gagne l'action `parcours-step`
+  (`subjectId`) — valide l'étape suivante, séquentiel ; 400 si le dossier
+  n'existe pas ou si le parcours est déjà complété. GET renvoie
+  `parcoursProgress` par dossier.
+- Client : progression portée dans l'état du mariage, miroir localStorage
+  (normalisation : entier ≥ 0, sinon 0).
+
+## CE QUI RESTE HORS PÉRIMÈTRE
+
+Échéances, prestataire, offres, contrats, documents, paiements, preuves,
+décisions · personnalisation par date/lieu/budget (données inconnues →
+« à confirmer », jamais supposées) · programme annuel multi-dossiers ·
+parcours lié à un lieu (l'Eden du Mont Noir restera une **donnée de
+contextualisation**, jamais une exception technique) · attestation
+(« attestation de parcours », pas « diplôme » — cadre juridique à définir) ·
+transmission de méthode. Rien de tout cela n'est simulé.
+
+## RISQUES
+
+- **Dérivation figée dans le code** : si l'arc change, `parcours_progress`
+  stocké peut dépasser le nouveau nombre d'étapes → le serveur borne à la
+  longueur dérivée et l'UI affiche « complété » au-delà ; transition douce.
+- **Progression locale/serveur** : règle existante par entrée (l'action en
+  cours gagne) — la progression ne décroît jamais côté serveur.
+- Vérification visuelle mobile impossible (pas de navigateur) — limitation
+  documentée, styles réutilisant les breakpoints existants.

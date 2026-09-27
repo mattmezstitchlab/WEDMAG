@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getSubject, weddingMomentOrder, type Subject } from "./wedding-data";
+import { getSubject, subjects, weddingMomentOrder, type Subject } from "./wedding-data";
 import {
+  buildDossierParcours,
   buildProjectTimeline,
   dossierStateLabels,
   dossierStates,
@@ -19,6 +20,7 @@ const dossier = (subjectId: string, state: WeddingDossier["state"] = "selection"
   state,
   source: "wedmag",
   id: null,
+  parcoursProgress: 0,
 });
 const project = (
   name: string,
@@ -116,10 +118,15 @@ test("a subject is never duplicated on the timeline (dedup by subject)", () => {
 
 // --- mergeRestoredWedding: restore rule for the wedding project ---
 
-const entry = (id: string | null, state: "selection" | "inspiration" = "selection") => ({
+const entry = (
+  id: string | null,
+  state: "selection" | "inspiration" | "contrat" = "selection",
+  parcoursProgress = 0,
+) => ({
   id,
   state,
   source: "wedmag",
+  parcoursProgress,
 });
 
 test("keeps the local project when persistence is local_only", () => {
@@ -217,7 +224,7 @@ test("keeps the dossiers shape as-is and repairs invalid entries", () => {
     dossiers: { dj: { state: "contrat", source: "wedmag" }, plage: { state: "bogus", source: 42 } },
   });
   assert.deepEqual(normalized, project("Mon mariage", {
-    dj: { id: null, state: "contrat", source: "wedmag" },
+    dj: entry(null, "contrat"),
     plage: entry(null),
   }));
 });
@@ -284,4 +291,71 @@ test("two weddings keep independent dossier maps (no shared state)", () => {
   const b = project("Mariage B", { dj: entry("uuid-b", "inspiration") });
   assert.notEqual(a.dossiers.dj.id, b.dossiers.dj.id);
   assert.notEqual(a.dossiers.dj.state, b.dossiers.dj.state);
+});
+
+
+// --- Parcours: the accompaniment layer (DOSSIER to PARCOURS PERSONNALISE) ---
+
+test("a Metier dossier derives the full accompaniment arc, nourished by real catalogue data", () => {
+  const parcours = buildDossierParcours(getSubject("photographe")!);
+  const titles = parcours.steps.map((step) => step.title);
+
+  assert.ok(titles.includes("Définir vos attentes"));
+  assert.ok(titles.includes("Identifier ce qui vous correspond"));
+  assert.ok(titles.includes("Sélectionner des photographes"));
+  assert.ok(titles.includes("Comparer les propositions"));
+  assert.ok(titles.includes("Examiner l’engagement"));
+  assert.ok(titles.includes("Préparer le jour J"));
+  assert.equal(titles.length, 8);
+  // Real data only: the photographer's own professionals and moments.
+  const selection = parcours.steps.find((step) => step.title === "Sélectionner des photographes")!;
+  assert.ok(selection.detail!.includes("Camille Novae"));
+  const jourJ = parcours.steps.find((step) => step.title === "Préparer le jour J")!;
+  assert.ok(jourJ.detail!.includes("Cérémonie"));
+});
+
+test("a Lieu dossier derives a different arc than a Metier dossier", () => {
+  const lieu = buildDossierParcours(getSubject("chateau")!);
+  const metier = buildDossierParcours(getSubject("photographe")!);
+
+  assert.ok(lieu.steps.some((step) => step.title === "Visiter et comparer"));
+  assert.ok(!lieu.steps.some((step) => step.title === "Sélectionner des photographes"));
+  assert.notDeepEqual(
+    lieu.steps.map((s) => s.title),
+    metier.steps.map((s) => s.title),
+  );
+});
+
+test("every catalogue subject derives a parcours with a consistent arc", () => {
+  for (const subject of subjects) {
+    const parcours = buildDossierParcours(subject);
+    assert.ok(parcours.steps.length >= 7, subject.id);
+    assert.ok(parcours.steps.length <= 9, subject.id);
+    assert.ok(parcours.lede.startsWith(String(parcours.steps.length)));
+    assert.equal(parcours.steps[0].title, "Définir vos attentes");
+    assert.equal(parcours.steps[parcours.steps.length - 1].title, "Préparer le jour J");
+  }
+});
+
+test("a step without real data keeps a null detail — nothing is invented", () => {
+  const sujet = { ...getSubject("photographe")!, constraints: [] };
+  const parcours = buildDossierParcours(sujet);
+  const dispo = parcours.steps.find((step) => step.title === "Vérifier les disponibilités")!;
+  assert.equal(dispo.detail, null);
+});
+
+test("normalizeWeddingState repairs an invalid parcours progress", () => {
+  const normalized = normalizeWeddingState({
+    name: "Mon mariage",
+    dossiers: {
+      dj: { id: null, state: "selection", source: "wedmag", parcoursProgress: 3 },
+      traiteur: { id: null, state: "selection", source: "wedmag", parcoursProgress: -2 },
+      plage: { id: null, state: "selection", source: "wedmag", parcoursProgress: "2" },
+    },
+  });
+  assert.deepEqual(normalized, project("Mon mariage", {
+    dj: entry(null, "selection", 3),
+    traiteur: entry(null),
+    plage: entry(null),
+  }));
 });

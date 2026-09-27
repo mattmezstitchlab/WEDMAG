@@ -1,0 +1,1 @@
+ALTER TABLE "wedding_dossiers" ADD COLUMN "parcours_progress" integer DEFAULT 0 NOT NULL;

@@ -71,6 +71,18 @@ test("POST set-state rejects an invalid state with 400", async () => {
   assert.deepEqual(await response.json(), { error: "Invalid state" });
 });
 
+test("POST parcours-step answers honestly in local_only", async () => {
+  const response = await post({ action: "parcours-step", subjectId: "dj" });
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { ok: true, persistence: "local_only" });
+});
+
+test("POST parcours-step rejects an unknown subjectId with 400", async () => {
+  const response = await post({ action: "parcours-step", subjectId: "album" });
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { error: "Unknown subjectId" });
+});
+
 test("POST rejects an invalid action with 400", async () => {
   const response = await post({ action: "delete", subjectId: "dj" });
   assert.equal(response.status, 400);

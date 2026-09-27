@@ -56,6 +56,14 @@ export const weddingDossiers = pgTable(
     subjectId: text("subject_id").notNull(),
     state: text("state").notNull().default("selection"),
     source: text("source").notNull().default("wedmag"),
+    /**
+     * Parcours (accompaniment layer): number of steps the couple has
+     * validated. The steps themselves are DERIVED from the catalogue
+     * subject at runtime (buildDossierParcours — single source of truth,
+     * nothing duplicated); this column only records the human-validated
+     * progress on the dossier it belongs to.
+     */
+    parcoursProgress: integer("parcours_progress").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
