@@ -3,11 +3,11 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { getDb, isDatabaseConfigured } from "@/db";
 import { weddingSelections } from "@/db/schema";
+import { parseSelectionRequest } from "@/lib/selection-validation";
 
 export const dynamic = "force-dynamic";
 
 const cookieName = "wwm-project";
-const validStatuses = new Set(["interested", "contacted", "chosen"]);
 
 export async function GET() {
   if (!isDatabaseConfigured()) {
@@ -34,23 +34,28 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  let body: { subjectId?: string; status?: string; action?: string };
+  let body: unknown;
 
   try {
-    body = (await request.json()) as typeof body;
+    body = await request.json() as unknown;
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const subjectId = body.subjectId?.trim();
+  // Strict validation against the catalogue: nothing reaches the database
+  // for a subject that does not exist, and an invalid status is rejected
+  // instead of silently overwriting a valid one.
+  const parsed = parseSelectionRequest(body);
 
-  if (!subjectId) {
-    return NextResponse.json({ error: "subjectId is required" }, { status: 400 });
+  if (!parsed.ok) {
+    return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
+
+  const write = parsed.write;
 
   if (!isDatabaseConfigured()) {
     // Honest answer: the browser keeps the project, the server stores nothing.
-    return NextResponse.json({ ok: true, subjectId, persistence: "local_only" });
+    return NextResponse.json({ ok: true, subjectId: write.subjectId, persistence: "local_only" });
   }
 
   const cookieStore = await cookies();
@@ -60,22 +65,21 @@ export async function POST(request: Request) {
   try {
     const db = getDb();
 
-    if (body.action === "remove") {
+    if (write.kind === "remove") {
       await db
         .delete(weddingSelections)
-        .where(and(eq(weddingSelections.sessionId, sessionId), eq(weddingSelections.subjectId, subjectId)));
+        .where(and(eq(weddingSelections.sessionId, sessionId), eq(weddingSelections.subjectId, write.subjectId)));
     } else {
-      const status = validStatuses.has(body.status ?? "") ? (body.status as string) : "interested";
       await db
         .insert(weddingSelections)
-        .values({ sessionId, subjectId, status })
+        .values({ sessionId, subjectId: write.subjectId, status: write.status })
         .onConflictDoUpdate({
           target: [weddingSelections.sessionId, weddingSelections.subjectId],
-          set: { status, updatedAt: sql`now()` },
+          set: { status: write.status, updatedAt: sql`now()` },
         });
     }
 
-    const response = NextResponse.json({ ok: true, subjectId, persistence: "server" });
+    const response = NextResponse.json({ ok: true, subjectId: write.subjectId, persistence: "server" });
     if (!existingSession) {
       response.cookies.set(cookieName, sessionId, {
         httpOnly: true,

@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getSubject, subjects, weddingMomentOrder, type Subject } from "./wedding-data";
-import { sortWeddingSelectionsByMoment, type WeddingSelection } from "./wedding-project";
+import { getSubject, subjects, weddingMomentOrder, type Subject, type WeddingStatus } from "./wedding-data";
+import {
+  mergeRestoredProject,
+  sortWeddingSelectionsByMoment,
+  type WeddingSelection,
+} from "./wedding-project";
 
 const selected = (subjectId: string, status: WeddingSelection["status"] = "interested"): WeddingSelection => ({ subjectId, status });
 const flattened = (input: readonly WeddingSelection[]) => sortWeddingSelectionsByMoment(input).flatMap((group) => group.selections);
@@ -103,4 +107,67 @@ test("does not mutate selections or catalogue Subjects", () => {
   sortWeddingSelectionsByMoment(input, getSubject);
   assert.deepEqual(input, snapshot);
   assert.deepEqual(subjects, subjectSnapshot);
+});
+
+// --- mergeRestoredProject: localStorage / server restore rule (audit M3) ---
+
+const project = (entries: Record<string, WeddingStatus>) => entries;
+
+test("keeps localStorage when persistence is local_only", () => {
+  const merged = mergeRestoredProject(
+    { persistence: "local_only", selections: project({ dj: "chosen" }) },
+    project({ traiteur: "interested" }),
+    project({}),
+  );
+  assert.deepEqual(merged, project({ traiteur: "interested" }));
+});
+
+test("keeps localStorage when the API was unavailable (503)", () => {
+  const merged = mergeRestoredProject(
+    { persistence: "unavailable", selections: project({}) },
+    project({ traiteur: "interested" }),
+    project({}),
+  );
+  assert.deepEqual(merged, project({ traiteur: "interested" }));
+});
+
+test("treats a non-empty server snapshot as authoritative", () => {
+  // Regression (audit M3): a selection removed from another browser used to
+  // resurrect because stale localStorage always won. The server snapshot
+  // now wins when it has content — keys it no longer contains disappear.
+  const merged = mergeRestoredProject(
+    { persistence: "server", selections: project({ dj: "chosen" }) },
+    project({ dj: "chosen", traiteur: "interested" }),
+    project({}),
+  );
+  assert.deepEqual(merged, project({ dj: "chosen" }));
+});
+
+test("lets in-flight choices win over the server snapshot", () => {
+  const merged = mergeRestoredProject(
+    { persistence: "server", selections: project({ dj: "interested" }) },
+    project({}),
+    project({ dj: "chosen", saxophoniste: "interested" }),
+  );
+  assert.deepEqual(merged, project({ dj: "chosen", saxophoniste: "interested" }));
+});
+
+test("keeps localStorage when the server snapshot is empty", () => {
+  // Empty cannot distinguish "never synced" from "all removed elsewhere";
+  // the non-destructive choice wins.
+  const merged = mergeRestoredProject(
+    { persistence: "server", selections: project({}) },
+    project({ traiteur: "interested" }),
+    project({}),
+  );
+  assert.deepEqual(merged, project({ traiteur: "interested" }));
+});
+
+test("server values win per key when both sides have them", () => {
+  const merged = mergeRestoredProject(
+    { persistence: "server", selections: project({ dj: "contacted" }) },
+    project({ dj: "chosen", traiteur: "interested" }),
+    project({}),
+  );
+  assert.deepEqual(merged, project({ dj: "contacted" }));
 });

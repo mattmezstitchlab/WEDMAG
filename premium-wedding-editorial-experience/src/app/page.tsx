@@ -12,7 +12,8 @@ import {
   type Subject,
   type WeddingStatus,
 } from "@/lib/wedding-data";
-import { sortWeddingSelectionsByMoment } from "@/lib/wedding-project";
+import { mergeRestoredProject, sortWeddingSelectionsByMoment } from "@/lib/wedding-project";
+import { useDialog } from "@/lib/use-dialog";
 
 type SelectionMap = Record<string, WeddingStatus>;
 
@@ -42,6 +43,11 @@ export default function HomePage() {
   const [toast, setToast] = useState<string | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
 
+  // Escape closes, Tab is trapped, focus is moved in and restored (see
+  // use-dialog). Purely keyboard/focus behaviour: no visual change.
+  const sheetRef = useDialog(Boolean(activeSubject), () => setActiveSubject(null));
+  const drawerRef = useDialog(drawerOpen, () => setDrawerOpen(false));
+
   useEffect(() => {
     let cancelled = false;
 
@@ -58,12 +64,15 @@ export default function HomePage() {
       }
 
       let fromServer: SelectionMap = {};
+      let serverPersistence: string | undefined;
       try {
         const response = await fetch("/api/wedding/selections");
         if (response.ok) {
           const payload = (await response.json()) as {
             selections?: { subjectId: string; status: WeddingStatus }[];
+            persistence?: string;
           };
+          serverPersistence = payload.persistence;
           if (payload.selections?.length) {
             fromServer = Object.fromEntries(payload.selections.map((item) => [item.subjectId, item.status]));
           }
@@ -73,8 +82,14 @@ export default function HomePage() {
       }
 
       if (cancelled) return;
-      // `current` wins: anything ticked while loading must not be discarded.
-      setProject((current) => ({ ...fromServer, ...local, ...current }));
+      // Deterministic restore rule (see mergeRestoredProject): the server
+      // snapshot wins when it has content, localStorage otherwise, and
+      // `current` (anything ticked while loading) always wins.
+      setProject((current) => mergeRestoredProject(
+        { persistence: serverPersistence, selections: fromServer },
+        local,
+        current,
+      ));
       setIsHydrated(true);
     };
 
@@ -303,7 +318,7 @@ export default function HomePage() {
       </footer>
 
       {activeSubject && (
-        <div className="overlay" role="dialog" aria-modal="true" aria-labelledby="subject-title">
+        <div className="overlay" ref={sheetRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="subject-title">
           <button className="overlay-backdrop" aria-label="Fermer la fiche" onClick={() => setActiveSubject(null)} />
           <article className="subject-sheet">
             <button className="close-sheet" onClick={() => setActiveSubject(null)} aria-label="Fermer">×</button>
@@ -324,7 +339,7 @@ export default function HomePage() {
                 <div className="editorial-block"><p className="block-title">SERVICES</p><ul>{activeSubject.services.map((item) => <li key={item}>{item}</li>)}</ul></div>
                 <div className="editorial-block"><p className="block-title">MOMENTS</p><ul>{activeSubject.moments.map((item) => <li key={item}>{item}</li>)}</ul></div>
               </div>
-              <div className="editorial-block plan-block"><p className="block-title">À PRÉVOIR</p><div className="tag-list">{activeSubject.toPlan.map((item) => <span key={item}>{item}</span>)}</div></div>
+              <div className="editorial-block"><p className="block-title">À PRÉVOIR</p><div className="tag-list">{activeSubject.toPlan.map((item) => <span key={item}>{item}</span>)}</div></div>
               <div className="editorial-block"><p className="block-title">ASSOCIÉ À</p><div className="relation-list">
                 {activeSubject.related.map((id) => {
                   const related = getSubject(id);
@@ -343,7 +358,7 @@ export default function HomePage() {
       {drawerOpen && (
         <div className="drawer-layer" role="dialog" aria-modal="true" aria-labelledby="project-title">
           <button className="drawer-backdrop" onClick={() => setDrawerOpen(false)} aria-label="Fermer Mon mariage" />
-          <aside className="project-drawer">
+          <aside className="project-drawer" ref={drawerRef} tabIndex={-1}>
             <div className="drawer-head">
               <div><p className="section-kicker">VOTRE ÉDITION PERSONNELLE</p><h2 id="project-title">MON<br /><i>MARIAGE.</i></h2></div>
               <button className="drawer-close" onClick={() => setDrawerOpen(false)} aria-label="Fermer">×</button>
@@ -409,7 +424,7 @@ export default function HomePage() {
         </div>
       )}
 
-      {toast && <div className="toast"><span>✓</span>{toast}<button onClick={() => setToast(null)}>×</button></div>}
+      {toast && <div className="toast" role="status" aria-live="polite"><span>✓</span>{toast}<button onClick={() => setToast(null)} aria-label="Fermer la notification">×</button></div>}
     </main>
   );
 }

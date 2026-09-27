@@ -39,6 +39,38 @@ The app degrades on purpose:
 - **Database configured but unreachable** → the API returns `503` with
   `{ persistence: "unavailable" }`; the UI keeps working from `localStorage`.
 
+### API contract
+
+`POST /api/wedding/selections` is strictly validated against the catalogue
+(the single source of truth in `src/lib/wedding-data.ts`):
+
+- `subjectId` must exist in the catalogue (which also bounds its length) —
+  anything else is a `400` and never reaches the database;
+- `status`, when present, must be one of `interested`, `contacted`,
+  `chosen` — invalid values are rejected with `400` instead of being
+  silently coerced, so an invalid request can never downgrade an existing
+  valid status;
+- absent `status` keeps the documented default (`interested`), matching the
+  schema's own default.
+
+### Restore rule (server vs localStorage)
+
+On load, the project is restored in one pass with a deterministic rule
+(`mergeRestoredProject` in `src/lib/wedding-project.ts`):
+
+- `local_only` or unreachable API → `localStorage` is the project;
+- `server` with a **non-empty** snapshot → the server snapshot is
+  authoritative: a selection removed from another browser disappears
+  instead of being resurrected by stale `localStorage`;
+- `server` with an **empty** snapshot → `localStorage` is kept (an empty
+  snapshot cannot distinguish "never synced" from "everything was removed
+  elsewhere"; the non-destructive choice wins);
+- anything ticked while the restore is in flight always wins.
+
+Known, accepted limitation: selections made while offline (their POST
+failed silently) can be dropped from the view when a non-empty server
+snapshot is later restored.
+
 ## Database
 
 The `wedding_selections` table must be created before server persistence works.
@@ -98,9 +130,12 @@ premium-wedding-editorial-experience/
 
 The catalogue currently ships **36 written covers** out of the 365 the full
 edition aims for. The UI reflects this honestly (`001—036 / 36 PUBLIÉES`, with a
-`037—365` teaser). Cover imagery is still served from external Pexels URLs via
-CSS `background-image`; moving it in-house and onto `next/image` is the main
-outstanding front-end task.
+`037—365` teaser). Ten subjects have a dedicated local cover under
+`public/covers/`; the remaining visuals (the shared image pool used by the
+other subjects, the hero and the closing section) are still served from
+external Pexels URLs via CSS `background-image` — sources and licence are
+recorded in `public/covers/CREDITS.md`. Moving that pool in-house and onto
+`next/image` is the main outstanding front-end task.
 
 See [`AUDIT-PRE-DEPLOIEMENT.md`](./AUDIT-PRE-DEPLOIEMENT.md) for the full
 pre-deployment audit and the remaining roadmap.
