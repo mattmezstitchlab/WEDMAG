@@ -3,7 +3,7 @@
  * Run with: npx tsx tools/data-integrity.ts (from the app dir)
  * Scratch tool used for the 2026-09-27 audit; not part of the app.
  */
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import {
   images,
@@ -66,17 +66,15 @@ for (const s of subjects) {
 }
 for (const heroSrc of images) usedLocal.add(heroSrc);
 
-// 6. Unused files in public/covers
-const coverFiles = [
-  "001-saxophoniste.jpg", "002-chateau.jpg", "003-traiteur.jpg", "004-dj.jpg",
-  "006-ceremonie-laique.jpg", "008-wedding-cake.jpg", "009-videaste.jpg",
-  "010-scenographie.jpg", "018-eclairage.jpg", "019-officiant.jpg",
-  "111-matiere.jpg", "112-soir.jpg", "113-matin.jpg", "114-parenthese.jpg",
-  "115-vrai-moment.jpg", "116-trace.jpg", "117-lumiere.jpg", "118-jardin.jpg",
-  "119-table.jpg",
-];
-const unused = coverFiles.filter((f) => !usedLocal.has(`/covers/${f}`));
+// 6. Unused image files in public/covers (scanned, not hardcoded)
+const coverDir = join(process.cwd(), "public", "covers");
+const coverFiles = readdirSync(coverDir).filter((file) => /\.(jpe?g|png|webp|avif)$/i.test(file));
+const unused = coverFiles.filter((file) => !usedLocal.has(`/covers/${file}`));
 if (unused.length) warns.push(`unused files in public/covers: ${unused.join(", ")}`);
+const missingOnDisk = [...usedLocal]
+  .filter((src) => src.startsWith("/"))
+  .filter((src) => !existsSync(join(process.cwd(), "public", src)));
+if (missingOnDisk.length) problems.push(`referenced local images missing on disk: ${missingOnDisk.join(", ")}`);
 
 // 7. professionals referenced in the sheet: page.tsx renders professionals[0] unguarded
 for (const s of subjects) {
