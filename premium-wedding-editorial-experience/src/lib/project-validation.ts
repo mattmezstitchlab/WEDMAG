@@ -1,3 +1,4 @@
+import { getSubjectProfessional } from "./wedding-data";
 import { validateSubjectId } from "./selection-validation";
 import {
   isDossierState,
@@ -22,6 +23,13 @@ export const defaultProjectName = "Mon mariage";
 /** The only situation the create action defaults to — the one that is real. */
 export const defaultProjectSituation = "mariage";
 
+/** Hard caps for the contact fields (real values are short; anything longer
+ * cannot be honest input and is rejected early). */
+const maxContactTextLength = 80;
+const maxContactNoteLength = 500;
+const maxProfessionalRefLength = 128;
+const maxContactIdLength = 64;
+
 const maxProjectNameLength = 80;
 
 export type ProjectRequest =
@@ -29,7 +37,16 @@ export type ProjectRequest =
   | { action: "attach"; subjectId: string }
   | { action: "detach"; subjectId: string }
   | { action: "set-state"; subjectId: string; state: string }
-  | { action: "parcours-step"; subjectId: string };
+  | { action: "parcours-step"; subjectId: string }
+  | {
+      action: "contact-add";
+      subjectId: string;
+      professionalRef: string | null;
+      name: string | null;
+      role: string | null;
+    }
+  | { action: "contact-attest"; subjectId: string; contactId: string; note: string | null }
+  | { action: "contact-remove"; subjectId: string; contactId: string };
 
 export type ProjectRequestParse =
   | { ok: true; request: ProjectRequest }
@@ -40,12 +57,16 @@ export function parseProjectRequest(body: unknown): ProjectRequestParse {
     return { ok: false, error: "Invalid request body" };
   }
 
-  const { action, name, situation, subjectId, state } = body as {
+  const { action, name, situation, subjectId, state, professionalRef, role, contactId, note } = body as {
     action?: unknown;
     name?: unknown;
     situation?: unknown;
     subjectId?: unknown;
     state?: unknown;
+    professionalRef?: unknown;
+    role?: unknown;
+    contactId?: unknown;
+    note?: unknown;
   };
 
   if (action === "create") {
@@ -112,6 +133,101 @@ export function parseProjectRequest(body: unknown): ProjectRequestParse {
     }
 
     return { ok: true, request: { action, subjectId: check.subjectId } };
+  }
+
+  if (action === "contact-add" || action === "contact-attest" || action === "contact-remove") {
+    const check = validateSubjectId(subjectId);
+
+    if (!check.ok) {
+      return { ok: false, error: check.error };
+    }
+
+    if (action === "contact-add") {
+      // Identity is EITHER a catalogue reference (belonging to the dossier's
+      // own subject) OR a person the couple declares — never both, never
+      // neither. No email, phone, price or qualification exists here.
+      if (professionalRef !== undefined && professionalRef !== null && typeof professionalRef !== "string") {
+        return { ok: false, error: "Invalid professionalRef" };
+      }
+      const reference = typeof professionalRef === "string" ? professionalRef.trim() : "";
+
+      if (name !== undefined && name !== null && typeof name !== "string") {
+        return { ok: false, error: "Invalid name" };
+      }
+      const declaredName = typeof name === "string" ? name.trim() : "";
+
+      if (role !== undefined && role !== null && typeof role !== "string") {
+        return { ok: false, error: "Invalid role" };
+      }
+      const declaredRole = typeof role === "string" ? role.trim() : "";
+
+      if (reference.length > 0 && declaredName.length > 0) {
+        return { ok: false, error: "professionalRef and name are mutually exclusive" };
+      }
+
+      if (reference.length > 0) {
+        if (reference.length > maxProfessionalRefLength) {
+          return { ok: false, error: "Invalid professionalRef" };
+        }
+        if (!getSubjectProfessional(check.subjectId, reference)) {
+          return { ok: false, error: reference.includes(":") ? "Unknown professionalRef" : "Invalid professionalRef" };
+        }
+        return {
+          ok: true,
+          request: { action: "contact-add", subjectId: check.subjectId, professionalRef: reference, name: null, role: null },
+        };
+      }
+
+      if (declaredName.length === 0) {
+        return { ok: false, error: "name is required" };
+      }
+      if (declaredName.length > maxContactTextLength) {
+        return { ok: false, error: "name is too long" };
+      }
+      if (declaredRole.length > maxContactTextLength) {
+        return { ok: false, error: "role is too long" };
+      }
+      return {
+        ok: true,
+        request: {
+          action: "contact-add",
+          subjectId: check.subjectId,
+          professionalRef: null,
+          name: declaredName,
+          role: declaredRole.length > 0 ? declaredRole : null,
+        },
+      };
+    }
+
+    // contact-attest / contact-remove: both address an existing contact.
+    if (typeof contactId !== "string" || contactId.trim().length === 0) {
+      return { ok: false, error: "contactId is required" };
+    }
+    const trimmedContactId = contactId.trim();
+    if (trimmedContactId.length > maxContactIdLength) {
+      return { ok: false, error: "contactId is too long" };
+    }
+
+    if (action === "contact-attest") {
+      if (note !== undefined && note !== null && typeof note !== "string") {
+        return { ok: false, error: "Invalid note" };
+      }
+      const trimmedNote = typeof note === "string" ? note.trim() : "";
+      if (trimmedNote.length > maxContactNoteLength) {
+        return { ok: false, error: "note is too long" };
+      }
+      return {
+        ok: true,
+        request: {
+          action: "contact-attest",
+          subjectId: check.subjectId,
+          contactId: trimmedContactId,
+          note: trimmedNote.length > 0 ? trimmedNote : null,
+        },
+      };
+    }
+
+    return { ok: true, request: { action: "contact-remove", subjectId: check.subjectId, contactId: trimmedContactId } };
   }
 
   return { ok: false, error: "Invalid action" };

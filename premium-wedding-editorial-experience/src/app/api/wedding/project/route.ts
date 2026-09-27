@@ -1,8 +1,8 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { getDb, isDatabaseConfigured } from "@/db";
-import { weddingDossiers, weddingProjects } from "@/db/schema";
+import { weddingDossierContacts, weddingDossiers, weddingProjects } from "@/db/schema";
 import { parseProjectRequest } from "@/lib/project-validation";
 import { buildDossierParcours } from "@/lib/wedding-pacte";
 import { getSubject } from "@/lib/wedding-data";
@@ -12,12 +12,23 @@ export const dynamic = "force-dynamic";
 // Same anonymous session as the selections: one identity, one cookie.
 const cookieName = "wwm-project";
 
+type StoredContact = {
+  id: string;
+  professionalRef: string | null;
+  declaredName: string | null;
+  declaredRole: string | null;
+  status: string;
+  note: string | null;
+  attestedAt: string | null;
+};
+
 type StoredDossier = {
   id: string;
   subjectId: string;
   state: string;
   source: string;
   parcoursProgress: number;
+  contacts: StoredContact[];
 };
 
 type StoredProject = {
@@ -40,7 +51,7 @@ async function loadProject(db: ReturnType<typeof getDb>, sessionId: string): Pro
 
   if (!project) return null;
 
-  const dossiers = await db
+  const dossierRows = await db
     .select({
       id: weddingDossiers.id,
       subjectId: weddingDossiers.subjectId,
@@ -52,7 +63,65 @@ async function loadProject(db: ReturnType<typeof getDb>, sessionId: string): Pro
     .where(eq(weddingDossiers.projectId, project.id))
     .orderBy(weddingDossiers.createdAt);
 
+  // The dossier's real people, loaded in one pass and grouped per dossier.
+  // `attestedAt` is only meaningful once the couple declared the contact.
+  const contactRows = dossierRows.length
+    ? await db
+        .select({
+          dossierId: weddingDossierContacts.dossierId,
+          id: weddingDossierContacts.id,
+          professionalRef: weddingDossierContacts.professionalRef,
+          declaredName: weddingDossierContacts.declaredName,
+          declaredRole: weddingDossierContacts.declaredRole,
+          status: weddingDossierContacts.status,
+          note: weddingDossierContacts.note,
+          attestedAt: sql<string | null>`case when ${weddingDossierContacts.status} = 'contacte' then ${weddingDossierContacts.updatedAt} else null end`,
+        })
+        .from(weddingDossierContacts)
+        .where(inArray(weddingDossierContacts.dossierId, dossierRows.map((dossier) => dossier.id)))
+        .orderBy(weddingDossierContacts.createdAt)
+    : [];
+
+  const contactsByDossier = new Map<string, StoredContact[]>();
+  for (const row of contactRows) {
+    const bucket = contactsByDossier.get(row.dossierId) ?? [];
+    bucket.push({
+      id: row.id,
+      professionalRef: row.professionalRef,
+      declaredName: row.declaredName,
+      declaredRole: row.declaredRole,
+      status: row.status,
+      note: row.note,
+      // Normalize the raw PostgreSQL timestamp to ISO — the client renders
+      // it with the browser's locale.
+      attestedAt: row.attestedAt ? new Date(row.attestedAt).toISOString() : null,
+    });
+    contactsByDossier.set(row.dossierId, bucket);
+  }
+
+  const dossiers: StoredDossier[] = dossierRows.map((dossier) => ({
+    ...dossier,
+    contacts: contactsByDossier.get(dossier.id) ?? [],
+  }));
+
   return { id: project.id, name: project.name, situation: project.situation, dossiers };
+}
+
+/**
+ * Loads a project's dossier for a subject — the anchor every contact
+ * action requires (a contact only exists inside its dossier).
+ */
+async function loadDossier(
+  db: ReturnType<typeof getDb>,
+  projectId: string,
+  subjectId: string,
+): Promise<{ id: string; state: string } | null> {
+  const [dossier] = await db
+    .select({ id: weddingDossiers.id, state: weddingDossiers.state })
+    .from(weddingDossiers)
+    .where(and(eq(weddingDossiers.projectId, projectId), eq(weddingDossiers.subjectId, subjectId)))
+    .limit(1);
+  return dossier ?? null;
 }
 
 async function touchProject(db: ReturnType<typeof getDb>, projectId: string) {
@@ -110,6 +179,7 @@ export async function POST(request: Request) {
 
   try {
     const db = getDb();
+    let contactId: string | undefined;
 
     if (action.action === "create") {
       // Idempotent: the unique session index keeps one project per session.
@@ -173,6 +243,115 @@ export async function POST(request: Request) {
           .update(weddingDossiers)
           .set({ parcoursProgress: dossier.parcoursProgress + 1, updatedAt: sql`now()` })
           .where(eq(weddingDossiers.id, dossier.id));
+      } else if (action.action === "contact-add") {
+        // A person enters the dossier: either a catalogue reference (already
+        // validated against the dossier's own subject) or a person the
+        // couple declares they met. Nothing else is recorded — no
+        // coordinates, no qualification, never a CRM.
+        const dossier = await loadDossier(db, project.id, action.subjectId);
+        if (!dossier) {
+          return NextResponse.json({ error: "No dossier for this subject" }, { status: 400 });
+        }
+
+        if (action.professionalRef) {
+          const [existing] = await db
+            .select({ id: weddingDossierContacts.id })
+            .from(weddingDossierContacts)
+            .where(
+              and(
+                eq(weddingDossierContacts.dossierId, dossier.id),
+                eq(weddingDossierContacts.professionalRef, action.professionalRef),
+              ),
+            )
+            .limit(1);
+          if (existing) {
+            return NextResponse.json({ error: "Professional already in this dossier" }, { status: 400 });
+          }
+        }
+
+        const [inserted] = await db
+          .insert(weddingDossierContacts)
+          .values({
+            dossierId: dossier.id,
+            professionalRef: action.professionalRef,
+            declaredName: action.name,
+            declaredRole: action.role,
+            status: "selectionne",
+          })
+          .returning({ id: weddingDossierContacts.id });
+        contactId = inserted.id;
+      } else if (action.action === "contact-attest") {
+        // The couple DECLARES they made contact. WEDMAG records the
+        // declaration (with its timestamp) — it verifies and certifies
+        // nothing. The declaration and the dossier's move to the contact
+        // state are ONE atomic fact: either both happen or neither does.
+        const dossier = await loadDossier(db, project.id, action.subjectId);
+        if (!dossier) {
+          return NextResponse.json({ error: "No dossier for this subject" }, { status: 400 });
+        }
+
+        const [contact] = await db
+          .select({ id: weddingDossierContacts.id, status: weddingDossierContacts.status, note: weddingDossierContacts.note })
+          .from(weddingDossierContacts)
+          .where(
+            and(
+              eq(weddingDossierContacts.dossierId, dossier.id),
+              eq(weddingDossierContacts.id, action.contactId),
+            ),
+          )
+          .limit(1);
+
+        if (!contact) {
+          return NextResponse.json({ error: "Unknown contact" }, { status: 400 });
+        }
+        if (contact.status === "contacte") {
+          return NextResponse.json({ error: "Contact already attested" }, { status: 400 });
+        }
+        if (contact.status === "confirme") {
+          return NextResponse.json({ error: "Contact is not attesting anymore" }, { status: 400 });
+        }
+
+        await db.transaction(async (tx) => {
+          await tx
+            .update(weddingDossierContacts)
+            .set({
+              status: "contacte",
+              note: action.note ?? contact.note,
+              updatedAt: sql`now()`,
+            })
+            .where(eq(weddingDossierContacts.id, contact.id));
+
+          // The dossier reaches the contact state ONLY through this declared
+          // fact — never through set-state (which keeps refusing it).
+          if (dossier.state !== "contact") {
+            await tx
+              .update(weddingDossiers)
+              .set({ state: "contact", updatedAt: sql`now()` })
+              .where(eq(weddingDossiers.id, dossier.id));
+          }
+        });
+      } else if (action.action === "contact-remove") {
+        // Removing a person never rewrites history: the dossier keeps its
+        // state (the couple may go back via Inspiration/Selection — a human
+        // decision, never an automatic regression).
+        const dossier = await loadDossier(db, project.id, action.subjectId);
+        if (!dossier) {
+          return NextResponse.json({ error: "No dossier for this subject" }, { status: 400 });
+        }
+
+        const removed = await db
+          .delete(weddingDossierContacts)
+          .where(
+            and(
+              eq(weddingDossierContacts.dossierId, dossier.id),
+              eq(weddingDossierContacts.id, action.contactId),
+            ),
+          )
+          .returning({ id: weddingDossierContacts.id });
+
+        if (removed.length === 0) {
+          return NextResponse.json({ error: "Unknown contact" }, { status: 400 });
+        }
       } else if (action.action === "set-state") {
         // returning() tells us whether the dossier actually existed — a
         // set-state on a subject with no dossier must not answer ok:true.
@@ -204,7 +383,7 @@ export async function POST(request: Request) {
       await touchProject(db, project.id);
     }
 
-    const response = NextResponse.json({ ok: true, persistence: "server" });
+    const response = NextResponse.json({ ok: true, persistence: "server", ...(contactId ? { contactId } : {}) });
     if (!existingSession) {
       response.cookies.set(cookieName, sessionId, {
         httpOnly: true,

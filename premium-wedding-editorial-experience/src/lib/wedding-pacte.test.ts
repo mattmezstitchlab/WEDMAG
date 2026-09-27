@@ -9,12 +9,16 @@ import {
   isDossierState,
   mergeRestoredWedding,
   normalizeWeddingState,
+  contactStatuses,
+  contactStatusLabels,
+  isContactStatus,
   isProjectSituation,
   projectSituationLabels,
   projectSituations,
   settableDossierStates,
   settableProjectSituations,
   weddingPhases,
+  type DossierContact,
   type WeddingDossier,
   type WeddingProjectState,
 } from "./wedding-pacte";
@@ -126,11 +130,13 @@ const entry = (
   id: string | null,
   state: "selection" | "inspiration" | "contrat" = "selection",
   parcoursProgress = 0,
+  contacts: WeddingProjectState["dossiers"][string]["contacts"] = [],
 ) => ({
   id,
   state,
   source: "wedmag",
   parcoursProgress,
+  contacts,
 });
 
 test("keeps the local project when persistence is local_only", () => {
@@ -226,6 +232,87 @@ test("only the real situation is settable — no life situation is invented", ()
   for (const situation of settableProjectSituations) {
     assert.ok((projectSituations as readonly string[]).includes(situation));
   }
+});
+
+test("contact statuses model the documented vocabulary, confirme reserved", () => {
+  assert.deepEqual([...contactStatuses], ["selectionne", "contacte", "confirme"]);
+  for (const status of contactStatuses) {
+    assert.ok(contactStatusLabels[status], `label missing for ${status}`);
+    assert.ok(isContactStatus(status));
+  }
+  assert.equal(isContactStatus("decouvert"), false);
+  assert.equal(isContactStatus("CONTACTE"), false);
+  assert.equal(isContactStatus(42), false);
+});
+
+test("normalizeWeddingState repairs invalid contacts and drops identity-less rows", () => {
+  const normalized = normalizeWeddingState({
+    name: "Mon mariage",
+    dossiers: {
+      photographe: {
+        id: null,
+        state: "selection",
+        source: "wedmag",
+        parcoursProgress: 2,
+        contacts: [
+          { id: "uuid-1", professionalRef: "photographe:camille-novae", declaredName: null, declaredRole: null, status: "contacte", note: "  Rencontre  ", attestedAt: "2026-09-27T10:00:00.000Z" },
+          { id: "uuid-2", professionalRef: null, declaredName: "  Marie Dupont  ", declaredRole: "", status: "bogus", note: 42, attestedAt: 42 },
+          { id: null, professionalRef: null, declaredName: "   ", status: "selectionne" },
+          "pas-un-contact",
+        ],
+      },
+    },
+  });
+  assert.deepEqual(normalized?.dossiers.photographe.contacts, [
+    { id: "uuid-1", professionalRef: "photographe:camille-novae", declaredName: null, declaredRole: null, status: "contacte", note: "Rencontre", attestedAt: "2026-09-27T10:00:00.000Z" },
+    { id: "uuid-2", professionalRef: null, declaredName: "Marie Dupont", declaredRole: null, status: "selectionne", note: null, attestedAt: null },
+  ]);
+  // An older mirror without contacts gains an empty list — never invented.
+  const upgraded = normalizeWeddingState({ name: "Mon mariage", items: { dj: { source: "wedmag" } } });
+  assert.deepEqual(upgraded?.dossiers.dj.contacts, []);
+});
+
+test("mergeRestoredWedding inherits server contact ids and keeps server-only contacts", () => {
+  const serverContact: DossierContact = {
+    id: "server-uuid",
+    professionalRef: "photographe:camille-novae",
+    declaredName: null,
+    declaredRole: null,
+    status: "selectionne",
+    note: null,
+  };
+  const serverOnly: DossierContact = {
+    id: "server-uuid-2",
+    professionalRef: null,
+    declaredName: "Marie Dupont",
+    declaredRole: "Photographe",
+    status: "contacte",
+    note: "Vue au salon",
+  };
+  const localContact: DossierContact = {
+    id: null,
+    professionalRef: "photographe:camille-novae",
+    declaredName: null,
+    declaredRole: null,
+    status: "contacte",
+    note: "Nous l’avons contactée",
+  };
+
+  // Realistic in-flight scenario: the couple attests the contact while the
+  // restore is loading (the attestation only exists in `current` so far).
+  const merged = mergeRestoredWedding(
+    { persistence: "server", project: project("Serveur", { photographe: entry("dossier-uuid", "selection", 0, [serverContact, serverOnly]) }) },
+    project("Local", { photographe: entry(null, "selection", 0, []) }),
+    project("En cours", { photographe: entry(null, "selection", 0, [localContact]) }),
+  );
+
+  // The in-flight gesture (attestation) wins on content, the SERVER id is
+  // inherited via the professional reference, and the contact created on
+  // another visit is kept.
+  assert.deepEqual(merged?.dossiers.photographe.contacts, [
+    { id: "server-uuid", professionalRef: "photographe:camille-novae", declaredName: null, declaredRole: null, status: "contacte", note: "Nous l’avons contactée" },
+    serverOnly,
+  ]);
 });
 
 // --- normalizeWeddingState: localStorage upgrade ---

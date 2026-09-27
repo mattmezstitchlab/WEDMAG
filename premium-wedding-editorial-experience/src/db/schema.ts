@@ -1,4 +1,5 @@
-import { integer, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { index, integer, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 /**
  * A project is deliberately anonymous in the prototype. The browser owns a
@@ -77,5 +78,43 @@ export const weddingDossiers = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [uniqueIndex("wedding_dossiers_project_subject_unique").on(table.projectId, table.subjectId)],
+);
+
+/**
+ * PHASE A — CONTACT: the real people of a dossier (see WEDMAG-DOSSIERS.md).
+ * A contact is NOT a CRM record: it exists only inside its dossier, attached
+ * to the dossier's stable id (the business anchor). Identity is either a
+ * catalogue REFERENCE (professional_ref = "subjectId:professionalId",
+ * resolved live at render — never a copy) or a person the couple declares
+ * they met (declared_name, never presented as belonging to the magazine).
+ * No email, phone, price, availability or qualification is stored or may
+ * ever be deduced. `status` records what the couple declared: "selectionne"
+ * (interested in this person), "contacte" (the couple declared they made
+ * contact — the system verifies nothing), "confirme" (reserved, Phase B).
+ */
+export const weddingDossierContacts = pgTable(
+  "wedding_dossier_contacts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    dossierId: uuid("dossier_id")
+      .notNull()
+      .references(() => weddingDossiers.id, { onDelete: "cascade" }),
+    professionalRef: text("professional_ref"),
+    declaredName: text("declared_name"),
+    declaredRole: text("declared_role"),
+    status: text("status").notNull().default("selectionne"),
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("wedding_dossier_contacts_dossier_idx").on(table.dossierId),
+    // One catalogue professional followed at most once per dossier. Declared
+    // persons tolerate homonyms on purpose (distinct real people, no global
+    // person registry — that would be a CRM).
+    uniqueIndex("wedding_dossier_contacts_dossier_professional_unique")
+      .on(table.dossierId, table.professionalRef)
+      .where(sql`${table.professionalRef} IS NOT NULL`),
+  ],
 );
 

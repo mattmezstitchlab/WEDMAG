@@ -39,7 +39,7 @@ export type Subject = {
   constraints: string[];
   resources: string[];
   related: string[];
-  professionals: { name: string; role: string; city: string }[];
+  professionals: Professional[];
 };
 
 export const images = [
@@ -53,7 +53,32 @@ export const images = [
   "https://images.pexels.com/photos/8516921/pexels-photo-8516921.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=1400&w=900",
 ];
 
-const pro = (name: string, role: string, city: string) => ({ name, role, city });
+/**
+ * A catalogue professional is an EDITORIAL REFERENCE (an illustration of the
+ * universe, like the images or the style) — never a tracked person: no
+ * contact details, no availability, no price, no qualification. The stable
+ * `id` is derived from the name and is unique within its subject (9 names
+ * are deliberately shared by two subjects; a contact therefore references
+ * the PAIR subjectId + professionalId, never the name alone).
+ */
+export type Professional = { id: string; name: string; role: string; city: string };
+
+const slugify = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[\u2019'"]/g, "")
+    .replace(/&/g, " ")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+const pro = (name: string, role: string, city: string): Professional => ({
+  id: slugify(name),
+  name,
+  role,
+  city,
+});
 
 export const subjects: Subject[] = [
   {
@@ -289,4 +314,21 @@ export const statusLabel: Record<WeddingStatus, string> = {
 
 export function getSubject(id: string) {
   return subjects.find((subject) => subject.id === id);
+}
+
+/**
+ * Resolves a catalogue professional reference ("subjectId:professionalId")
+ * within a subject's own universe. The reference is only valid when its
+ * subject part IS the given subject (a dossier may only follow a
+ * professional from its own subject's editorial universe) and the
+ * professional id resolves — anything else is unknown, never coerced.
+ */
+export function getSubjectProfessional(subjectId: string, professionalRef: string): Professional | undefined {
+  const separator = professionalRef.indexOf(":");
+  if (separator <= 0 || separator === professionalRef.length - 1) return undefined;
+  if (professionalRef.slice(0, separator) !== subjectId) return undefined;
+  const subject = getSubject(subjectId);
+  if (!subject) return undefined;
+  const professionalId = professionalRef.slice(separator + 1);
+  return subject.professionals.find((professional) => professional.id === professionalId);
 }

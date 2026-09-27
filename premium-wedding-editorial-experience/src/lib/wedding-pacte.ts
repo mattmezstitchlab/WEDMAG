@@ -88,6 +88,51 @@ export function isProjectSituation(value: unknown): value is ProjectSituation {
   return typeof value === "string" && (projectSituations as readonly string[]).includes(value);
 }
 
+// --- Contacts: the dossier's real people (Phase A — CONTACT) ---
+
+/**
+ * What the COUPLE declared about a person in their dossier. "selectionne" =
+ * interest in this person; "contacte" = the couple declared they made
+ * contact (WEDMAG records the declaration, it verifies and certifies
+ * nothing); "confirme" = the professional's answer (reserved for Phase B —
+ * modelled like the reserved dossier states, never simulated). "decouvert"
+ * is NOT a status: a professional merely visible in the magazine leaves no
+ * row anywhere (tracking discoveries would be prospect tracking).
+ */
+export const contactStatuses = ["selectionne", "contacte", "confirme"] as const;
+
+export type ContactStatus = (typeof contactStatuses)[number];
+
+/** Editorial labels — the only vocabulary shown to the user. */
+export const contactStatusLabels: Record<ContactStatus, string> = {
+  selectionne: "Sélectionné",
+  contacte: "Contacté",
+  confirme: "Confirmé",
+};
+
+export function isContactStatus(value: unknown): value is ContactStatus {
+  return typeof value === "string" && (contactStatuses as readonly string[]).includes(value);
+}
+
+/**
+ * A real person in a dossier. Identity is EITHER a catalogue reference
+ * ("subjectId:professionalId", resolved live — never a copy) OR a person
+ * the couple declares they met (never presented as belonging to the
+ * magazine). No email, phone, price, availability or qualification —
+ * those fields do not exist and must never be deduced.
+ */
+export type DossierContact = {
+  /** Server uuid once persisted; a local uuid while local_only. */
+  id: string | null;
+  professionalRef: string | null;
+  declaredName: string | null;
+  declaredRole: string | null;
+  status: ContactStatus;
+  note: string | null;
+  /** When the couple declared the contact (server updatedAt at attestation). */
+  attestedAt?: string | null;
+};
+
 /**
  * A dossier of the wedding project. Born from a cover added to the wedding,
  * it keeps the catalogue subject as its identity (reference, never a copy).
@@ -113,6 +158,8 @@ export type WeddingDossierEntry = {
   source: string;
   /** Parcours steps validated by the couple (0 = not started). */
   parcoursProgress: number;
+  /** The real people of this dossier (Phase A — CONTACT). */
+  contacts: DossierContact[];
 };
 
 /** Client shape of the wedding project (server rows flattened to a map). */
@@ -142,7 +189,16 @@ export function normalizeWeddingState(value: unknown): WeddingProjectState | nul
 
   const fill = (
     entries:
-      | Record<string, { id?: unknown; state?: unknown; source?: unknown; parcoursProgress?: unknown }>
+      | Record<
+          string,
+          {
+            id?: unknown;
+            state?: unknown;
+            source?: unknown;
+            parcoursProgress?: unknown;
+            contacts?: unknown;
+          }
+        >
       | null
       | undefined,
   ) => {
@@ -158,6 +214,7 @@ export function normalizeWeddingState(value: unknown): WeddingProjectState | nul
           entry.parcoursProgress >= 0
             ? entry.parcoursProgress
             : 0,
+        contacts: normalizeDossierContacts(entry?.contacts),
       };
     }
   };
@@ -166,6 +223,52 @@ export function normalizeWeddingState(value: unknown): WeddingProjectState | nul
   fill(dossiers as Record<string, { state?: unknown; source?: unknown }>);
 
   return normalized;
+}
+
+/**
+ * Repairs a possibly older or hand-corrupted contacts mirror. A contact
+ * without any identity (neither a catalogue reference nor a declared name)
+ * cannot exist and is dropped — never invented. Unknown statuses fall back
+ * to "selectionne"; notes and roles must be strings or vanish.
+ */
+function normalizeDossierContacts(value: unknown): DossierContact[] {
+  if (!Array.isArray(value)) return [];
+  const contacts: DossierContact[] = [];
+  for (const raw of value) {
+    if (typeof raw !== "object" || raw === null) continue;
+    const contact = raw as {
+      id?: unknown;
+      professionalRef?: unknown;
+      declaredName?: unknown;
+      declaredRole?: unknown;
+      status?: unknown;
+      note?: unknown;
+      attestedAt?: unknown;
+    };
+    const professionalRef =
+      typeof contact.professionalRef === "string" && contact.professionalRef.length > 0
+        ? contact.professionalRef
+        : null;
+    const declaredName =
+      typeof contact.declaredName === "string" && contact.declaredName.trim().length > 0
+        ? contact.declaredName.trim()
+        : null;
+    if (!professionalRef && !declaredName) continue;
+    contacts.push({
+      id: typeof contact.id === "string" && contact.id.length > 0 ? contact.id : null,
+      professionalRef,
+      declaredName,
+      declaredRole:
+        typeof contact.declaredRole === "string" && contact.declaredRole.trim().length > 0
+          ? contact.declaredRole.trim()
+          : null,
+      status: isContactStatus(contact.status) ? contact.status : "selectionne",
+      note: typeof contact.note === "string" && contact.note.trim().length > 0 ? contact.note.trim() : null,
+      attestedAt:
+        typeof contact.attestedAt === "string" && contact.attestedAt.length > 0 ? contact.attestedAt : null,
+    });
+  }
+  return contacts;
 }
 
 /** Snapshot of GET /api/wedding/project as seen by the client. */
@@ -365,11 +468,45 @@ export function mergeRestoredWedding(
   // none — the dossier's stable identity must survive the restore.
   const dossiers: WeddingProjectState["dossiers"] = { ...base.dossiers };
   for (const [subjectId, entry] of Object.entries(current.dossiers)) {
-    dossiers[subjectId] = { ...entry, id: entry.id ?? base.dossiers[subjectId]?.id ?? null };
+    dossiers[subjectId] = {
+      ...entry,
+      id: entry.id ?? base.dossiers[subjectId]?.id ?? null,
+      contacts: mergeDossierContacts(base.dossiers[subjectId]?.contacts, entry.contacts),
+    };
   }
 
   return {
     name: current.name || base.name,
     dossiers,
   };
+}
+
+/**
+ * Merges restored server contacts with in-flight local ones. Local content
+ * (status, note) wins — the couple's latest gesture is authoritative — but
+ * the SERVER id is inherited whenever the contact can be matched (by id,
+ * then by identity: catalogue reference, or declared name + role). Server
+ * contacts absent from the local mirror are kept: a contact created on
+ * another visit must not disappear.
+ */
+function mergeDossierContacts(
+  server: DossierContact[] | undefined,
+  local: DossierContact[] | undefined,
+): DossierContact[] {
+  const merged = [...(server ?? [])];
+  for (const contact of local ?? []) {
+    const byIdentity = (candidate: DossierContact) =>
+      contact.professionalRef
+        ? candidate.professionalRef === contact.professionalRef
+        : !candidate.professionalRef &&
+            candidate.declaredName === contact.declaredName &&
+            candidate.declaredRole === contact.declaredRole;
+
+    let index = contact.id ? merged.findIndex((candidate) => candidate.id === contact.id) : -1;
+    if (index === -1) index = merged.findIndex(byIdentity);
+
+    if (index === -1) merged.push(contact);
+    else merged[index] = { ...contact, id: merged[index].id ?? contact.id ?? null };
+  }
+  return merged;
 }

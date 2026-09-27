@@ -63,11 +63,28 @@ the catalogue subject, progress is a simple counter on the dossier). The dossier
 modelled (inspiration → sélection → contact → proposition → engagement →
 contrat → confirmé → préparation → jour J → archive) but only `inspiration`
 and `selection` are settable for now — reserved states are refused with
-`400`, never simulated. Likewise, the life situations are modelled
+`400`, never simulated. **`contact` included**: the dossier reaches the
+contact state ONLY through the couple's explicit declaration
+(`contact-attest`), never through `set-state`. Likewise, the life situations are modelled
 (`mariage`, `naissance`, `deuil`, `reconnexion`, `couple-famille`,
 `transmission`) but only `mariage` is real today: an unknown situation is
 refused with `400` (`Invalid situation`) and a modelled-but-not-real one
-with `situation is not available yet` — nothing is ever invented. See
+with `situation is not available yet` — nothing is ever invented.
+
+`GET` returns each dossier's real people (`contacts`): either a catalogue
+reference (`professionalRef` = `subjectId:professionalId`, resolved live —
+never a copy) or a person the couple declares they met (`declaredName`,
+optional `declaredRole`). A contact carries a `status`
+(`selectionne` / `contacte` — `confirme` is modelled and reserved), an
+optional `note` and, once attested, `attestedAt`. There is deliberately
+**no** email, phone, price, availability or qualification anywhere, and no
+global person registry: contacts exist only inside their dossier (no CRM).
+`contact-add` returns the created `contactId`; `contact-attest`
+{`subjectId`, `contactId`, `note`?} records the couple's declaration and
+moves the dossier to the contact state in one atomic transaction — WEDMAG
+records the declaration, it verifies and certifies nothing;
+`contact-remove` removes the person without rewriting the dossier's
+history. See
 [`PACTE-MARIAGE.md`](../PACTE-MARIAGE.md) and
 [`WEDMAG-DOSSIERS.md`](../WEDMAG-DOSSIERS.md).
 

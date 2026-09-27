@@ -113,6 +113,42 @@ test("POST create refuses an unknown situation with 400", async () => {
   assert.deepEqual(await response.json(), { error: "Invalid situation" });
 });
 
+test("POST contact actions answer honestly in local_only", async () => {
+  const add = await post({ action: "contact-add", subjectId: "photographe", professionalRef: "photographe:camille-novae" });
+  assert.equal(add.status, 200);
+  assert.deepEqual(await add.json(), { ok: true, persistence: "local_only" });
+
+  const declared = await post({ action: "contact-add", subjectId: "photographe", name: "Marie Dupont", role: "Photographe" });
+  assert.equal(declared.status, 200);
+  assert.deepEqual(await declared.json(), { ok: true, persistence: "local_only" });
+
+  const attest = await post({ action: "contact-attest", subjectId: "photographe", contactId: "uuid-1", note: "Rencontre au salon" });
+  assert.equal(attest.status, 200);
+  assert.deepEqual(await attest.json(), { ok: true, persistence: "local_only" });
+
+  const remove = await post({ action: "contact-remove", subjectId: "photographe", contactId: "uuid-1" });
+  assert.equal(remove.status, 200);
+  assert.deepEqual(await remove.json(), { ok: true, persistence: "local_only" });
+});
+
+test("POST contact-add rejects an unknown professionalRef with 400 before any storage", async () => {
+  const response = await post({ action: "contact-add", subjectId: "photographe", professionalRef: "photographe:inconnu" });
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { error: "Unknown professionalRef" });
+});
+
+test("POST contact-add refuses a nameless declared contact with 400", async () => {
+  const response = await post({ action: "contact-add", subjectId: "photographe" });
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { error: "name is required" });
+});
+
+test("POST contact-attest requires a contactId with 400", async () => {
+  const response = await post({ action: "contact-attest", subjectId: "photographe" });
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { error: "contactId is required" });
+});
+
 test("POST create refuses a modelled-but-not-real situation with 400 — no project is invented", async () => {
   for (const situation of ["naissance", "deuil", "reconnexion", "couple-famille", "transmission"]) {
     const response = await post({ action: "create", situation });

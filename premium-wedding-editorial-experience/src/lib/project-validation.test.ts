@@ -66,6 +66,120 @@ test("create refuses a modelled situation that is not real yet — nothing is in
   }
 });
 
+test("set-state still cannot force contact — the only path is the couple's declaration", () => {
+  const result = parse({ action: "set-state", subjectId: "dj", state: "contact" });
+  assert.equal(result.ok, false);
+  assert.equal(result.error, "state is not available yet");
+});
+
+test("contact-add accepts a catalogue reference belonging to the dossier's subject", () => {
+  assert.deepEqual(parse({ action: "contact-add", subjectId: "photographe", professionalRef: "photographe:camille-novae" }), {
+    ok: true,
+    request: { action: "contact-add", subjectId: "photographe", professionalRef: "photographe:camille-novae", name: null, role: null },
+  });
+  // Whitespace is trimmed, the reference itself is never rewritten.
+  assert.deepEqual(parse({ action: "contact-add", subjectId: "photographe", professionalRef: "  photographe:camille-novae  " }), {
+    ok: true,
+    request: { action: "contact-add", subjectId: "photographe", professionalRef: "photographe:camille-novae", name: null, role: null },
+  });
+});
+
+test("contact-add rejects an unknown or malformed professionalRef, never coerced", () => {
+  for (const professionalRef of [42, true, {}, ["x"]]) {
+    const result = parse({ action: "contact-add", subjectId: "photographe", professionalRef });
+    assert.equal(result.ok, false, `professionalRef ${JSON.stringify(professionalRef)} must be rejected`);
+    assert.equal(result.error, "Invalid professionalRef");
+  }
+  for (const [label, body] of [
+    ["unknown id within the right subject", { action: "contact-add", subjectId: "photographe", professionalRef: "photographe:inconnu" }],
+    ["a reference from another subject's universe", { action: "contact-add", subjectId: "dj", professionalRef: "photographe:camille-novae" }],
+    ["no pair at all", { action: "contact-add", subjectId: "photographe", professionalRef: "camille-novae" }],
+    ["hard cap before any catalogue lookup", { action: "contact-add", subjectId: "photographe", professionalRef: `photographe:${"a".repeat(200)}` }],
+  ] as const) {
+    const result = parse(body);
+    assert.equal(result.ok, false, label);
+    assert.equal(result.error, label.includes("pair") || label.includes("cap") ? "Invalid professionalRef" : "Unknown professionalRef");
+  }
+});
+
+test("contact-add accepts a declared person with a valid name and optional role", () => {
+  assert.deepEqual(parse({ action: "contact-add", subjectId: "photographe", name: "  Marie Dupont  ", role: " Photographe " }), {
+    ok: true,
+    request: { action: "contact-add", subjectId: "photographe", professionalRef: null, name: "Marie Dupont", role: "Photographe" },
+  });
+  assert.deepEqual(parse({ action: "contact-add", subjectId: "photographe", name: "Marie Dupont" }), {
+    ok: true,
+    request: { action: "contact-add", subjectId: "photographe", professionalRef: null, name: "Marie Dupont", role: null },
+  });
+});
+
+test("contact-add rejects a nameless, oversized or malformed declared person", () => {
+  for (const [label, body, error] of [
+    ["neither a reference nor a declaration", { action: "contact-add", subjectId: "photographe" }, "name is required"],
+    ["a blank name", { action: "contact-add", subjectId: "photographe", name: "   " }, "name is required"],
+    ["an oversized name", { action: "contact-add", subjectId: "photographe", name: "a".repeat(81) }, "name is too long"],
+    ["an oversized role", { action: "contact-add", subjectId: "photographe", name: "Marie", role: "r".repeat(81) }, "role is too long"],
+    ["a non-string name", { action: "contact-add", subjectId: "photographe", name: 42 }, "Invalid name"],
+    ["a non-string role", { action: "contact-add", subjectId: "photographe", name: "Marie", role: 42 }, "Invalid role"],
+  ] as const) {
+    const result = parse(body);
+    assert.equal(result.ok, false, label);
+    assert.equal(result.error, error);
+  }
+});
+
+test("contact-add refuses a contact that is both a reference and a declaration", () => {
+  const result = parse({ action: "contact-add", subjectId: "photographe", professionalRef: "photographe:camille-novae", name: "Marie Dupont" });
+  assert.equal(result.ok, false);
+  assert.equal(result.error, "professionalRef and name are mutually exclusive");
+});
+
+test("contact-attest and contact-remove require a valid contactId", () => {
+  for (const [label, body, error] of [
+    ["attest without contactId", { action: "contact-attest", subjectId: "photographe" }, "contactId is required"],
+    ["attest with a blank contactId", { action: "contact-attest", subjectId: "photographe", contactId: "  " }, "contactId is required"],
+    ["attest with a non-string contactId", { action: "contact-attest", subjectId: "photographe", contactId: 42 }, "contactId is required"],
+    ["attest with an oversized contactId", { action: "contact-attest", subjectId: "photographe", contactId: "c".repeat(65) }, "contactId is too long"],
+    ["remove without contactId", { action: "contact-remove", subjectId: "photographe" }, "contactId is required"],
+  ] as const) {
+    const result = parse(body);
+    assert.equal(result.ok, false, label);
+    assert.equal(result.error, error);
+  }
+
+  assert.deepEqual(parse({ action: "contact-remove", subjectId: "photographe", contactId: "uuid-1" }), {
+    ok: true,
+    request: { action: "contact-remove", subjectId: "photographe", contactId: "uuid-1" },
+  });
+});
+
+test("contact-attest carries an optional, bounded note", () => {
+  assert.deepEqual(parse({ action: "contact-attest", subjectId: "photographe", contactId: "uuid-1", note: "  Rencontre au salon  " }), {
+    ok: true,
+    request: { action: "contact-attest", subjectId: "photographe", contactId: "uuid-1", note: "Rencontre au salon" },
+  });
+  assert.deepEqual(parse({ action: "contact-attest", subjectId: "photographe", contactId: "uuid-1", note: "   " }), {
+    ok: true,
+    request: { action: "contact-attest", subjectId: "photographe", contactId: "uuid-1", note: null },
+  });
+  for (const [label, body, error] of [
+    ["an oversized note", { action: "contact-attest", subjectId: "photographe", contactId: "uuid-1", note: "n".repeat(501) }, "note is too long"],
+    ["a non-string note", { action: "contact-attest", subjectId: "photographe", contactId: "uuid-1", note: 42 }, "Invalid note"],
+  ] as const) {
+    const result = parse(body);
+    assert.equal(result.ok, false, label);
+    assert.equal(result.error, error);
+  }
+});
+
+test("contact actions validate the subjectId against the catalogue like every other action", () => {
+  for (const action of ["contact-add", "contact-attest", "contact-remove"]) {
+    const result = parse({ action, subjectId: "inexistant", contactId: "uuid-1" });
+    assert.equal(result.ok, false, action);
+    assert.equal(result.error, "Unknown subjectId");
+  }
+});
+
 test("attach and detach validate the subjectId against the catalogue", () => {
   assert.deepEqual(parse({ action: "attach", subjectId: "dj" }), { ok: true, request: { action: "attach", subjectId: "dj" } });
   assert.deepEqual(parse({ action: "detach", subjectId: " dj " }), { ok: true, request: { action: "detach", subjectId: "dj" } });

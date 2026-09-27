@@ -16,10 +16,13 @@ import { mergeRestoredProject, sortWeddingSelectionsByMoment } from "@/lib/weddi
 import {
   buildDossierParcours,
   buildProjectTimeline,
+  contactStatusLabels,
   dossierStateLabels,
+  isContactStatus,
   mergeRestoredWedding,
   normalizeWeddingState,
   settableDossierStates,
+  type DossierContact,
   type DossierState,
   type WeddingProjectState,
 } from "@/lib/wedding-pacte";
@@ -94,6 +97,10 @@ export default function HomePage() {
   const [newWeddingName, setNewWeddingName] = useState("");
   // The dossier currently open (its cover stays its visual identity).
   const [activeDossier, setActiveDossier] = useState<Subject | null>(null);
+  // Phase A — CONTACT: minimal editorial inputs (no form wall, two fields).
+  const [declaredName, setDeclaredName] = useState("");
+  const [declaredRole, setDeclaredRole] = useState("");
+  const [contactNotes, setContactNotes] = useState<Record<string, string>>({});
 
   // Escape closes, Tab is trapped, focus is moved in and restored (see
   // use-dialog). Purely keyboard/focus behaviour: no visual change.
@@ -150,7 +157,25 @@ export default function HomePage() {
         const response = await fetch("/api/wedding/project");
         if (response.ok) {
           const payload = (await response.json()) as {
-            project?: { name: string; dossiers: { id: string; subjectId: string; state: string; source: string; parcoursProgress: number }[] } | null;
+            project?: {
+              name: string;
+              dossiers: {
+                id: string;
+                subjectId: string;
+                state: string;
+                source: string;
+                parcoursProgress: number;
+                contacts: {
+                  id: string;
+                  professionalRef: string | null;
+                  declaredName: string | null;
+                  declaredRole: string | null;
+                  status: string;
+                  note: string | null;
+                  attestedAt: string | null;
+                }[];
+              }[];
+            } | null;
             persistence?: string;
           };
           weddingPersistence = payload.persistence;
@@ -165,6 +190,17 @@ export default function HomePage() {
                     state: dossier.state as DossierState,
                     source: dossier.source,
                     parcoursProgress: typeof dossier.parcoursProgress === "number" ? dossier.parcoursProgress : 0,
+                    contacts: Array.isArray(dossier.contacts)
+                      ? dossier.contacts.map((contact) => ({
+                          id: typeof contact.id === "string" ? contact.id : null,
+                          professionalRef: typeof contact.professionalRef === "string" ? contact.professionalRef : null,
+                          declaredName: typeof contact.declaredName === "string" ? contact.declaredName : null,
+                          declaredRole: typeof contact.declaredRole === "string" ? contact.declaredRole : null,
+                          status: isContactStatus(contact.status) ? contact.status : "selectionne",
+                          note: typeof contact.note === "string" ? contact.note : null,
+                          attestedAt: typeof contact.attestedAt === "string" ? contact.attestedAt : null,
+                        }))
+                      : [],
                   },
                 ]),
               ),
@@ -241,6 +277,153 @@ export default function HomePage() {
     }).catch(() => undefined);
   };
 
+  // Same call, but the caller needs the answer (contact-add returns the
+  // server uuid of the created contact — the anchor for later attestation).
+  const syncWeddingJson = async (body: Record<string, unknown>): Promise<{ contactId?: string } | undefined> => {
+    try {
+      const response = await fetch("/api/wedding/project", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!response.ok) return undefined;
+      return (await response.json()) as { contactId?: string };
+    } catch {
+      return undefined;
+    }
+  };
+
+  // --- Phase A — CONTACT: the dossier's real people ---
+
+  const addContactToDossier = (subject: Subject, contact: DossierContact) => {
+    const localId = contact.id ?? crypto.randomUUID();
+    setWedding((current) => {
+      if (!current) return current;
+      const dossier = current.dossiers[subject.id];
+      if (!dossier) return current;
+      return {
+        ...current,
+        dossiers: {
+          ...current.dossiers,
+          [subject.id]: { ...dossier, contacts: [...dossier.contacts, { ...contact, id: localId }] },
+        },
+      };
+    });
+    void syncWeddingJson({
+      action: "contact-add",
+      subjectId: subject.id,
+      ...(contact.professionalRef
+        ? { professionalRef: contact.professionalRef }
+        : { name: contact.declaredName, role: contact.declaredRole ?? "" }),
+    }).then((result) => {
+      // The server uuid replaces the local one — same person, real anchor.
+      if (!result?.contactId) return;
+      setWedding((current) => {
+        if (!current) return current;
+        const dossier = current.dossiers[subject.id];
+        if (!dossier) return current;
+        return {
+          ...current,
+          dossiers: {
+            ...current.dossiers,
+            [subject.id]: {
+              ...dossier,
+              contacts: dossier.contacts.map((existing) =>
+                existing.id === localId ? { ...existing, id: result.contactId as string } : existing,
+              ),
+            },
+          },
+        };
+      });
+    });
+    setToast("Cette personne rejoint votre dossier.");
+  };
+
+  const addCatalogueContact = (subject: Subject, professionalRef: string) => {
+    addContactToDossier(subject, {
+      id: null,
+      professionalRef,
+      declaredName: null,
+      declaredRole: null,
+      status: "selectionne",
+      note: null,
+      attestedAt: null,
+    });
+  };
+
+  const addDeclaredContact = (subject: Subject) => {
+    const name = declaredName.trim();
+    if (!name) return;
+    addContactToDossier(subject, {
+      id: null,
+      professionalRef: null,
+      declaredName: name,
+      declaredRole: declaredRole.trim() || null,
+      status: "selectionne",
+      note: null,
+      attestedAt: null,
+    });
+    setDeclaredName("");
+    setDeclaredRole("");
+  };
+
+  const attestContact = (subject: Subject, contact: DossierContact) => {
+    const contactId = contact.id ?? crypto.randomUUID();
+    const note = (contactNotes[contactId] ?? "").trim();
+    setWedding((current) => {
+      if (!current) return current;
+      const dossier = current.dossiers[subject.id];
+      if (!dossier) return current;
+      return {
+        ...current,
+        dossiers: {
+          ...current.dossiers,
+          [subject.id]: {
+            ...dossier,
+            // The declared fact moves the dossier to Contact — the only
+            // path to that state (set-state keeps refusing it).
+            state: dossier.state === "contact" ? dossier.state : "contact",
+            contacts: dossier.contacts.map((existing) =>
+              existing === contact
+                ? {
+                    ...existing,
+                    id: contactId,
+                    status: "contacte",
+                    note: note || existing.note,
+                    attestedAt: new Date().toISOString(),
+                  }
+                : existing,
+            ),
+          },
+        },
+      };
+    });
+    syncWedding({
+      action: "contact-attest",
+      subjectId: subject.id,
+      contactId,
+      ...(note ? { note } : {}),
+    });
+    setToast("Contact déclaré — votre dossier passe en Contact.");
+  };
+
+  const removeContact = (subject: Subject, contact: DossierContact) => {
+    setWedding((current) => {
+      if (!current) return current;
+      const dossier = current.dossiers[subject.id];
+      if (!dossier) return current;
+      return {
+        ...current,
+        dossiers: {
+          ...current.dossiers,
+          [subject.id]: { ...dossier, contacts: dossier.contacts.filter((existing) => existing !== contact) },
+        },
+      };
+    });
+    if (contact.id) syncWedding({ action: "contact-remove", subjectId: subject.id, contactId: contact.id });
+    setToast("Personne retirée du dossier.");
+  };
+
   const addSubject = (subject: Subject) => {
     if (project[subject.id]) {
       setDrawerOpen(true);
@@ -253,7 +436,7 @@ export default function HomePage() {
     if (wedding && !wedding.dossiers[subject.id]) {
       setWedding((current) =>
         current
-          ? { ...current, dossiers: { ...current.dossiers, [subject.id]: { id: null, state: "selection", source: "wedmag", parcoursProgress: 0 } } }
+          ? { ...current, dossiers: { ...current.dossiers, [subject.id]: { id: null, state: "selection", source: "wedmag", parcoursProgress: 0, contacts: [] } } }
           : current,
       );
       syncWedding({ action: "attach", subjectId: subject.id });
@@ -307,7 +490,7 @@ export default function HomePage() {
     const label = getSubject(subjectId)?.title ?? "Cette inspiration";
     setWedding((current) =>
       current
-        ? { ...current, dossiers: { ...current.dossiers, [subjectId]: { id: null, state: "selection", source: "wedmag", parcoursProgress: 0 } } }
+        ? { ...current, dossiers: { ...current.dossiers, [subjectId]: { id: null, state: "selection", source: "wedmag", parcoursProgress: 0, contacts: [] } } }
         : current,
     );
     syncWedding({ action: "attach", subjectId });
@@ -653,6 +836,7 @@ export default function HomePage() {
                                       {settableDossierStates.map((state) => (
                                         <option key={state} value={state}>{dossierStateLabels[state]}</option>
                                       ))}
+                                      {dossier.state === "contact" && <option value="contact" disabled>Contact</option>}
                                     </select>
                                   )}
                                   <button className="remove-item" onClick={() => detachSubject(subject.id)} aria-label={`Retirer le dossier ${subject.title} du mariage`}>×</button>
@@ -817,6 +1001,114 @@ export default function HomePage() {
                   ))}
                 </div>
               </div>
+
+              {(() => {
+                const entry = wedding.dossiers[activeDossier.id];
+                const contacts = entry?.contacts ?? [];
+                return (
+                  <div className="editorial-block dossier-people">
+                    <div className="section-with-note"><p className="block-title">LES PERSONNES</p><span>CE QUI S’EST PASSÉ</span></div>
+
+                    <div className="people-references">
+                      {activeDossier.professionals.map((professional) => {
+                        const reference = `${activeDossier.id}:${professional.id}`;
+                        const followed = contacts.some((contact) => contact.professionalRef === reference);
+                        return (
+                          <div className="people-reference" key={professional.id}>
+                            <div>
+                              <p>{professional.name}</p>
+                              <span>{professional.role} · {professional.city}</span>
+                            </div>
+                            {followed ? (
+                              <em>Dans votre dossier</em>
+                            ) : (
+                              <button
+                                onClick={() => addCatalogueContact(activeDossier, reference)}
+                                aria-label={`Suivre ${professional.name} dans ce dossier`}
+                              >+</button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <p className="people-hint">Ces personnes illustrent le magazine. Suivre l’une d’elles l’ajoute à votre dossier — ce qui se passe ensuite vous appartient.</p>
+
+                    <div className="people-add">
+                      <input
+                        value={declaredName}
+                        onChange={(event) => setDeclaredName(event.target.value)}
+                        placeholder="Une personne que vous avez rencontrée"
+                        maxLength={80}
+                        aria-label="Nom de la personne rencontrée"
+                      />
+                      <input
+                        value={declaredRole}
+                        onChange={(event) => setDeclaredRole(event.target.value)}
+                        placeholder="Son métier (optionnel)"
+                        maxLength={80}
+                        aria-label="Métier de la personne rencontrée"
+                      />
+                      <button
+                        onClick={() => addDeclaredContact(activeDossier)}
+                        disabled={!declaredName.trim()}
+                        aria-label="Ajouter cette personne au dossier"
+                      >+</button>
+                    </div>
+
+                    {contacts.length > 0 && (
+                      <div className="people-contacts">
+                        {contacts.map((contact) => {
+                          const professional = contact.professionalRef
+                            ? activeDossier.professionals.find((candidate) => `${activeDossier.id}:${candidate.id}` === contact.professionalRef)
+                            : undefined;
+                          const identity = professional?.name ?? contact.declaredName;
+                          const contactKey = contact.id ?? contact.professionalRef ?? contact.declaredName ?? "";
+                          const note = contactNotes[contactKey] ?? "";
+                          return (
+                            <article className="people-contact" key={contactKey}>
+                              <div className="people-contact-head">
+                                <b>{identity ?? "Référence retirée — à confirmer"}</b>
+                                <span className={`contact-status ${contact.status === "contacte" ? "contact-status-live" : ""}`}>
+                                  {contactStatusLabels[contact.status]}
+                                </span>
+                              </div>
+                              <span className="people-contact-role">
+                                {professional ? `${professional.role} · ${professional.city} · référence du magazine` : (contact.declaredRole || "Personne rencontrée")}
+                              </span>
+                              {contact.status === "contacte" ? (
+                                <div className="contact-declared">
+                                  {contact.attestedAt && (
+                                    <p className="contact-date">Vous avez déclaré l’avoir contactée le {new Date(contact.attestedAt).toLocaleDateString("fr-FR")}.</p>
+                                  )}
+                                  {contact.note && <p className="contact-note">« {contact.note} »</p>}
+                                </div>
+                              ) : (
+                                <div className="contact-attest">
+                                  <input
+                                    value={note}
+                                    onChange={(event) => setContactNotes((current) => ({ ...current, [contactKey]: event.target.value }))}
+                                    placeholder="Ce qui s’est passé (optionnel)"
+                                    maxLength={500}
+                                    aria-label="Note sur ce contact"
+                                  />
+                                  <button className="add-wide" onClick={() => attestContact(activeDossier, contact)}>
+                                    NOUS L’AVONS CONTACTÉ
+                                  </button>
+                                </div>
+                              )}
+                              <button
+                                className="contact-remove"
+                                onClick={() => removeContact(activeDossier, contact)}
+                                aria-label="Retirer cette personne du dossier"
+                              >×</button>
+                            </article>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               {(() => {
                 const entry = wedding.dossiers[activeDossier.id];

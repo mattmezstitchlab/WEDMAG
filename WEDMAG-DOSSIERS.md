@@ -556,3 +556,256 @@ leur condition soit réelle) :
   base).
 - Intégrité du catalogue : 36 sujets, relations et moments canoniques,
   arcs 7–9 étapes — inchangés.
+
+# PHASE A — CONTACT
+
+Statut : **implémentée et vérifiée** (E-A1 validée puis codée selon le
+protocole ; vérifications ci-dessous). Base : 5b3bad6 → commit dédié.
+
+Objectif : faire passer le dossier d'une intention éditoriale à un fait
+réel — **sans transformer WEDMAG en CRM** (pas de carnet d'adresses, pas
+de pipeline, pas de liste de contacts indépendante, pas de fiche
+professionnel). Le professionnel devient une partie du récit du dossier :
+VOUS AVEZ CHOISI → VOUS AVEZ CONTACTÉ → VOICI CE QUI S'EST PASSÉ.
+
+## EXISTANT (audit des 8 points demandés)
+
+1. **Identification d'un professionnel réel aujourd'hui : impossible.**
+   Aucune entité, aucune table, aucune représentation. Les seules
+   identités du système sont la session anonyme, le projet, le dossier et
+   le sujet catalogue. Une personne réelle n'existe nulle part.
+2. **Catalogue vs référence éditoriale.** `subject.professionals` =
+   72 références `{name, role, city}` (2 par sujet, 36/36 sujets). Ce
+   sont des illustrations éditoriales, au même titre que les images ou
+   les styles : pas d'identité stable, pas de qualification, pas de
+   disponibilité, pas de prix, pas de statut d'existence, pas de moyen de
+   contact. L'UI ne les montre qu'une fois (fiche couverture,
+   « À DÉCOUVRIR AUSSI », premier nom seulement). **Découverte d'audit
+   décisive : 9 noms sont portés par deux sujets différents** (Ariane
+   Verne → cérémonie laïque + officiant ; Herbier Moderne et Maison
+   Pollen → fleuriste + bouquet ; Nourrir l'Instant → traiteur + brunch ;
+   etc.) — des recroisements éditoriaux voulus. Une référence par nom
+   serait donc **ambiguë** : la clé de référence doit être le couple
+   (sujet, professionnel).
+3. **Rattachement à un dossier précis.** Aucune structure actuelle ne
+   peut porter l'association (le dossier n'a que des colonnes scalaires).
+   L'ancrage documenté depuis la Phase 1 est `dossier.id` — c'est lui que
+   contrat, documents, échéances et paiements référenceront. Le contact
+   s'y rattache aujourd'hui : nouvelle table enfant, `dossier_id` FK
+   cascade, jamais de colonne sur le dossier (un dossier peut avoir
+   plusieurs interlocuteurs réels).
+4. **Informations minimales réellement nécessaires** (pour enregistrer
+   qu'un contact a eu lieu) : **qui** (identité : référence catalogue OU
+   identité déclarée par le couple), **statut** (sélectionné / contacté),
+   **quand** (l'horodatage de l'attestation par le système), **ce qui
+s’est passé** (note libre optionnelle). Hors modèle, volontairement :
+   email, téléphone, prix, disponibilité, qualification, réputation,
+   avis — ni stockés ni déduits (tenir un carnet de coordonnées serait
+   le premier pas vers le CRM ; le couple a contacté par ses propres
+   moyens, WEDMAG enregistre le fait, pas les coordonnées).
+5. **Anti-duplication.** Référence catalogue = `(subjectId,
+   professionalId)` résolu **en direct au rendu** (comme subjectId pour
+   le dossier) : le nom affiché est toujours celui du catalogue, jamais
+   une copie stockée. Une personne hors catalogue = champs déclarés
+   (`declaredName` requis, `declaredRole` optionnel), explicitement
+   **non catalogue** — le système ne prétend jamais qu'elle en fait
+   partie. Jamais de déduction : voir un nom dans le magazine
+   n'établit ni disponibilité, ni prix, ni relation avec WEDMAG.
+6. **Les quatre distinctions.** *Découvert* = état éditorial implicite :
+   le professionnel figure dans l'univers du dossier via le catalogue —
+   **aucune ligne créée** (suivre des découvertes serait du tracking de
+   prospects). *Sélectionné* = le couple a manifesté un intérêt réel
+   pour CETTE personne dans CE dossier → ligne créée. *Contacté* =
+   **fait attesté par le couple** (« nous l'avons contacté »), avec
+   horodatage et note optionnelle. *Confirmé* = la réponse du
+   professionnel — modélisé, **réservé** (Phase B ; exige un cadre que
+   cette phase n'a pas).
+7. **Évolution de l'état vers contact : uniquement sur fait.** `contact`
+   est déjà modélisé (10 états) et refusé à l'écriture (« state is not
+   available yet »). Décision : il **reste non settable** —
+   `set-state: contact` continuera d'être refusé. Le seul chemin vers
+   l'état contact est l'action d'attestation `contact-attest`, qui dans
+   **une seule transaction** marque le contact « contacté » ET fait
+   progresser le dossier inspiration/sélection → contact. Un clic sur
+   une proposition (« Contacter ce professionnel ») n'atteste rien :
+   l'attestation est toujours un geste explicite distinct du couple.
+   Preuve minimale honnête dans un système à sessions anonymes : **le
+   fait déclaré et horodaté par le couple** — WEDMAG ne vérifie rien
+   (pas de tracking de liens ni d'emails), il enregistre ce que le
+   couple atteste. Jamais de régression automatique (supprimer le
+   contact n'efface pas l'histoire) ; le couple peut revenir en arrière
+   par set-state inspiration/sélection (décision humaine).
+8. **Usage futur par le parcours et la Timeline.** Le parcours reste
+   une couche PURE sur le sujet (il propose, jamais n'atteste) ;
+   l'adaptation aux décisions réelles (ex. l'étape « Sélectionner des X »
+   nourrie des contacts réels plutôt que des références éditoriales)
+   est une couche de dérivation séparée, Phase B — le compteur de
+   progression reste la validation humaine. La Timeline reste l'unique
+   chronologie : les contacts ne s'y inscrivent pas dans cette phase
+   (ce sont des faits du dossier, pas des moments du mariage) ; quand
+   échéances et propositions existeront, elles référenceront ces
+   contacts et s'inscriront dans la Timeline existante. Le GET expose
+   dès maintenant les contacts par dossier pour que ces couches aient
+   la donnée.
+
+## MODÈLE PROPOSÉ (minimal)
+
+```
+MARIAGE (wedding_projects, situation='mariage')
+  └── DOSSIER (wedding_dossiers)
+        └── CONTACT (wedding_dossier_contacts — NOUVEAU, migration 0005)
+              ├── identité : professional_ref (référence catalogue,
+              │     résolution directe) OU declared_name + declared_role
+              │     (personne réelle hors catalogue)
+              ├── status : selectionne | contacte | confirme (modélisé,
+              │     réservé) — decouvert = implicite, jamais stocké
+              ├── note (optionnelle, « ce qui s'est passé »)
+              └── created_at / updated_at (created_at = horodatage
+                    de l'attestation quand elle a lieu)
+```
+
+- **Catalogue** : `professionals` gagne un `id` stable par sujet
+  (`{id, name, role, city}` — évolution additive des 36 sujets, aucun
+  changement éditorial). Obligé par l'audit : 9 noms en doublon
+  interdisent la référence par nom. La référence d'un contact =
+  (subjectId du dossier, professionalId) — validée serveur contre le
+  catalogue (le pro doit appartenir à l'univers DU dossier).
+- **Contrainte d'unicité** : un même professionnel catalogue ne peut
+  être sélectionné qu'une fois par dossier (index unique partiel sur
+  `(dossier_id, professional_ref)` WHERE professional_ref IS NOT NULL).
+  Les personnes déclarées tolèrent les homonymes (des personnes réelles
+  distinctes ; aucun registre global de personnes — c'est précisément ce
+  qui interdit le CRM).
+- **API** : `contact-add` {subjectId, professionalRef?} (catalogue) ou
+  {subjectId, name, role?} (déclaré) → renvoie le `contactId` créé ;
+  `contact-attest` {subjectId, contactId, note?} → contact contacté +
+  état dossier → contact (transaction) ; `contact-remove`
+  {subjectId, contactId}. Validation stricte habituelle : 400
+  « Unknown professionalRef » / « name is required » / « No dossier for
+  this subject » / « Unknown contact » / « Contact already attested » ;
+  honnête en local_only.
+- **État du dossier** : `contact` rejoint l'affichage (libellé « Contact
+   » dans la fiche) mais **pas** les états settables ; les pastilles
+   Inspiration/Sélection restent le moyen humain de revenir en arrière.
+- **Client** : `WeddingDossierEntry` gagne `contacts[]` (miroir
+  localStorage, normalisation réparatrice comme pour le reste) ; GET
+  renvoie les contacts ; fusion par entrée avec héritage des ids serveur
+  par `professionalRef`.
+
+## UX (éditoriale, minuscule)
+
+Dans la fiche dossier, une section « LES PERSONNES — CE QUI S'EST
+PASSÉ » : les références éditoriales du sujet (nom · métier · ville,
+marquées comme références du magazine) avec un « + » discret pour dire
+« cette personne nous intéresse » ; un ajout minimal « UNE PERSONNE QUE
+VOUS AVEZ RENCONTRÉE » (nom requis, rôle optionnel — pas de formulaire
+massif) ; puis la liste des personnes réelles du dossier avec leur
+statut (Sélectionné / Contacté), l'action « NOUS L'AVONS CONTACTÉ »
+(note optionnelle), la note affichée comme récit, et un retrait discret.
+L'état du dossier affiche « Contact » quand un contact est attesté.
+Aucune vue liste globale, aucun tableau, aucun pipeline : les personnes
+n'existent qu'à l'intérieur de leur dossier.
+
+## MIGRATIONS
+
+- 0005 (additive) : `CREATE TABLE wedding_dossier_contacts` (id uuid pk,
+  dossier_id uuid NOT NULL FK cascade, professional_ref text NULL,
+  declared_name text NULL, declared_role text NULL, status text NOT NULL
+  DEFAULT 'selectionne', note text NULL, created_at/updated_at
+  timestamptz NOT NULL DEFAULT now()) + index sur dossier_id + index
+  unique partiel (dossier_id, professional_ref). Aucune colonne
+  modifiée, aucune donnée existante touchée.
+- Invariant applicatif (testé) : professional_ref OU declared_name est
+  renseigné — la base reste simple, la couche validation + les tests
+  portent l'invariant.
+
+## CE QUI RESTE HORS PÉRIMÈTRE
+
+Propositions, contrats, documents, échéances, paiements, décisions
+structurées (Phase B/C) · statut « confirmé » (réservé) · coordonnées
+(email/téléphone) et tout champ de qualification/disponibilité/prix ·
+registre global de personnes ou recherche de professionnels
+(anti-marketplace, anti-CRM) · contacts dans la Timeline · adaptation du
+parcours aux faits · mention ou dépendance Eden (produit distinct).
+
+## RISQUES
+
+- **Race ajout→attestation** : l'attestation adresse un contactId que le
+  client ne connaît qu'après la réponse du `contact-add` (ou la
+  restauration GET). L'UI n'active l'attestation que sur une ligne
+  identifiée ; sinon 400 honnête « Unknown contact ».
+- **Référence catalogue retirée** (le pro disparaît d'une future édition
+  du magazine) : le contact existe toujours (le fait reste), l'affichage
+  résout à vide → « référence retirée — à confirmer », jamais d'invention.
+- **Attestation sur déclaration** : le système enregistre la parole du
+  couple, il ne vérifie rien — c'est assumé et documenté (système à
+  sessions anonymes, pas de tracking).
+- **Homonymes déclarés** : deux « Marie » sur un dossier = deux lignes
+  (personnes réelles distinctes) ; le retrait manuel désambiguïse.
+
+## DÉCISION PROPOSÉE (E-A1) — en attente de validation
+
+L'audit justifie une implémentation minimale réelle : le dossier ne peut
+devenir le centre de gravité qu'en enregistrant son premier fait du
+monde réel, et l'ancrage `dossier.id` est prêt depuis la Phase 1. Le
+périmètre exact :
+
+1. `wedding_dossier_contacts` (migration 0005 additive) — ci-dessus.
+2. Ids stables des professionnels catalogue (additif, 72 entrées,
+   aucun changement éditorial).
+3. Vocabulaire des statuts + normalisation client + GET enrichi.
+4. Trois actions API validées strictement ; état `contact` atteignable
+   UNIQUEMENT par attestation (transaction), jamais par set-state.
+5. Section « LES PERSONNES » de la fiche dossier (UX ci-dessus).
+6. Tests : catalogue (72 ids, unicité par sujet, résolution, doublons de
+   noms assumés) · validation (réf incohérente, nom manquant, bornes)
+   · domaine (vocabulaire, normalisation, fusion) · route local_only ·
+   runtime PostgreSQL : attach → sélection catalogue + personne déclarée
+   → attestation → état contact → double attestation refusée →
+   set-state contact toujours refusé → retrait sans régression d'état →
+   isolation inter-sessions → GET complet. Parcours et Timeline :
+   non modifiés, tests de non-régression.
+
+Si la décision est validée, l'implémentation suivra le protocole complet
+(code minimal → tests → build → runtimes → diff → commit → push). Si
+l'audit devait être jugé insuffisant, aucun code ne sera écrit.
+
+## VÉRIFICATIONS (E-A1, exécutées)
+
+- Lint, typecheck, tests **121/121** (102 précédents intacts + 19
+  nouveaux : 3 catalogue — 72 ids slugs uniques par sujet, 9 doublons de
+  noms assumés, résolution par paire uniquement ; 9 validation — dont
+  set-state contact toujours refusé, ref inconnue/mauvais sujet/malformée,
+  déclaré sans nom, ref+nom exclusifs, contactId/note bornés ; 3 domaine —
+  vocabulaire des statuts, réparation des contacts, fusion avec héritage
+  des ids serveur ; 4 route local_only), build sans DATABASE_URL.
+- **Migration 0005** vérifiée sur PostgreSQL 18.4 embarqué : chaîne
+  complète 0000→0005 depuis zéro (table + FK cascade + index + index
+  unique partiel WHERE professional_ref IS NOT NULL confirmés en base) ;
+  **chemin de mise à niveau réel** reproduit (base pré-0005 avec projet,
+  dossiers, progress 5 et 2, états contact/selection) → 0005 appliquée
+  seule, aucune donnée modifiée, table créée vide.
+- **Runtime PostgreSQL, scénario complet** : create → attach → contact-add
+  catalogue (contactId renvoyé) → contact-add personne déclarée → double
+  référence → 400 « Professional already in this dossier » → sans dossier
+  → 400 « No dossier for this subject » → GET (contacts complets) →
+  **contact-attest atomique** (statut contacte + note + attestedAt ISO ET
+  état dossier → contact, une seule transaction) → double attestation →
+  400 « Contact already attested » → contactId inconnu → 400 « Unknown
+  contact » → **set-state contact toujours 400** → retour arrière humain
+  (inspiration) sans perdre les contacts → parcours-step toujours
+  fonctionnel → retrait d'un contact sans régression d'état → isolation
+  stricte (session B : aucun dossier, contact de A inatteignable).
+- Runtime local_only : les trois actions répondent honnêtement
+  `{ ok: true, persistence: "local_only" }` ; les validations restent 400
+  avant tout stockage ; strings de la section « LES PERSONNES » présentes
+  dans le bundle client.
+- Chemin 503 (base indisponible) : POST contact-attest → 503 unavailable,
+  GET avec session → 503, GET / → 200, validations 400 inchangées.
+- Parcours et Timeline : non modifiés (aucune ligne touchée dans leur
+  code de dérivation) ; 102 tests précédents intacts.
+- Incident d'environnement (transparence) : le sandbox a été réinitialisé
+  en cours de phase (dépôt re-cloné à l'état 81a4d5a, node_modules perdu).
+  Récupération : fetch origin, `git reset 5b3bad6` sans toucher à l'arbre
+  de travail, réinstallation des dépendances — état vérifié par typecheck
+  et 102/102 tests avant de reprendre l'implémentation.
