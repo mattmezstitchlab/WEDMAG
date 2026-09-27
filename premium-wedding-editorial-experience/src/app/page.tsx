@@ -173,6 +173,7 @@ export default function HomePage() {
                   status: string;
                   note: string | null;
                   attestedAt: string | null;
+                  confirmedAt: string | null;
                 }[];
               }[];
             } | null;
@@ -199,6 +200,7 @@ export default function HomePage() {
                           status: isContactStatus(contact.status) ? contact.status : "selectionne",
                           note: typeof contact.note === "string" ? contact.note : null,
                           attestedAt: typeof contact.attestedAt === "string" ? contact.attestedAt : null,
+                          confirmedAt: typeof contact.confirmedAt === "string" ? contact.confirmedAt : null,
                         }))
                       : [],
                   },
@@ -405,6 +407,46 @@ export default function HomePage() {
       ...(note ? { note } : {}),
     });
     setToast("Contact déclaré — votre dossier passe en Contact.");
+  };
+
+  // B1: the couple DECLARES the professional confirmed — honest wording,
+  // never presented as a verified fact or a contract. The dossier's own
+  // state does not move: two distinct facts.
+  const confirmContact = (subject: Subject, contact: DossierContact) => {
+    const contactId = contact.id ?? crypto.randomUUID();
+    const note = (contactNotes[contactId] ?? "").trim();
+    setWedding((current) => {
+      if (!current) return current;
+      const dossier = current.dossiers[subject.id];
+      if (!dossier) return current;
+      return {
+        ...current,
+        dossiers: {
+          ...current.dossiers,
+          [subject.id]: {
+            ...dossier,
+            contacts: dossier.contacts.map((existing) =>
+              existing === contact
+                ? {
+                    ...existing,
+                    id: contactId,
+                    status: "confirme",
+                    note: note || existing.note,
+                    confirmedAt: new Date().toISOString(),
+                  }
+                : existing,
+            ),
+          },
+        },
+      };
+    });
+    syncWedding({
+      action: "contact-confirm",
+      subjectId: subject.id,
+      contactId,
+      ...(note ? { note } : {}),
+    });
+    setToast("Confirmation déclarée — vous déclarez que ce professionnel a confirmé.");
   };
 
   const removeContact = (subject: Subject, contact: DossierContact) => {
@@ -1075,14 +1117,7 @@ export default function HomePage() {
                               <span className="people-contact-role">
                                 {professional ? `${professional.role} · ${professional.city} · référence du magazine` : (contact.declaredRole || "Personne rencontrée")}
                               </span>
-                              {contact.status === "contacte" ? (
-                                <div className="contact-declared">
-                                  {contact.attestedAt && (
-                                    <p className="contact-date">Vous avez déclaré l’avoir contactée le {new Date(contact.attestedAt).toLocaleDateString("fr-FR")}.</p>
-                                  )}
-                                  {contact.note && <p className="contact-note">« {contact.note} »</p>}
-                                </div>
-                              ) : (
+                              {contact.status === "selectionne" ? (
                                 <div className="contact-attest">
                                   <input
                                     value={note}
@@ -1094,6 +1129,35 @@ export default function HomePage() {
                                   <button className="add-wide" onClick={() => attestContact(activeDossier, contact)}>
                                     NOUS L’AVONS CONTACTÉ
                                   </button>
+                                </div>
+                              ) : contact.status === "contacte" ? (
+                                <div className="contact-declared">
+                                  {contact.attestedAt && (
+                                    <p className="contact-date">Vous avez déclaré l’avoir contactée le {new Date(contact.attestedAt).toLocaleDateString("fr-FR")}.</p>
+                                  )}
+                                  {contact.note && <p className="contact-note">« {contact.note} »</p>}
+                                  <div className="contact-attest">
+                                    <input
+                                      value={note}
+                                      onChange={(event) => setContactNotes((current) => ({ ...current, [contactKey]: event.target.value }))}
+                                      placeholder="Sa réponse, en vos mots (optionnel)"
+                                      maxLength={500}
+                                      aria-label="Note sur la confirmation déclarée"
+                                    />
+                                    <button className="add-wide" onClick={() => confirmContact(activeDossier, contact)}>
+                                      LE PROFESSIONNEL NOUS A CONFIRMÉ
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="contact-declared">
+                                  {contact.attestedAt && (
+                                    <p className="contact-date">Vous avez déclaré l’avoir contactée le {new Date(contact.attestedAt).toLocaleDateString("fr-FR")}.</p>
+                                  )}
+                                  {contact.confirmedAt && (
+                                    <p className="contact-date">Vous déclarez que ce professionnel a confirmé, le {new Date(contact.confirmedAt).toLocaleDateString("fr-FR")}.</p>
+                                  )}
+                                  {contact.note && <p className="contact-note">« {contact.note} »</p>}
                                 </div>
                               )}
                               <button

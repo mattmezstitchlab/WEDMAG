@@ -20,6 +20,7 @@ type StoredContact = {
   status: string;
   note: string | null;
   attestedAt: string | null;
+  confirmedAt: string | null;
 };
 
 type StoredDossier = {
@@ -75,7 +76,8 @@ async function loadProject(db: ReturnType<typeof getDb>, sessionId: string): Pro
           declaredRole: weddingDossierContacts.declaredRole,
           status: weddingDossierContacts.status,
           note: weddingDossierContacts.note,
-          attestedAt: sql<string | null>`case when ${weddingDossierContacts.status} = 'contacte' then ${weddingDossierContacts.updatedAt} else null end`,
+          attestedAt: weddingDossierContacts.attestedAt,
+          confirmedAt: weddingDossierContacts.confirmedAt,
         })
         .from(weddingDossierContacts)
         .where(inArray(weddingDossierContacts.dossierId, dossierRows.map((dossier) => dossier.id)))
@@ -92,9 +94,10 @@ async function loadProject(db: ReturnType<typeof getDb>, sessionId: string): Pro
       declaredRole: row.declaredRole,
       status: row.status,
       note: row.note,
-      // Normalize the raw PostgreSQL timestamp to ISO — the client renders
-      // it with the browser's locale.
+      // Normalize the raw PostgreSQL timestamps to ISO — the client renders
+      // them with the browser's locale.
       attestedAt: row.attestedAt ? new Date(row.attestedAt).toISOString() : null,
+      confirmedAt: row.confirmedAt ? new Date(row.confirmedAt).toISOString() : null,
     });
     contactsByDossier.set(row.dossierId, bucket);
   }
@@ -317,6 +320,7 @@ export async function POST(request: Request) {
             .set({
               status: "contacte",
               note: action.note ?? contact.note,
+              attestedAt: sql`now()`,
               updatedAt: sql`now()`,
             })
             .where(eq(weddingDossierContacts.id, contact.id));
@@ -330,6 +334,50 @@ export async function POST(request: Request) {
               .where(eq(weddingDossiers.id, dossier.id));
           }
         });
+      } else if (action.action === "contact-confirm") {
+        // B1: the couple DECLARES the professional confirmed. WEDMAG has no
+        // channel to collect the professional's answer — this is the
+        // couple's words, recorded with its own timestamp, never a verified
+        // fact and never a contract. The contact's status and the dossier's
+        // state stay two distinct facts: the dossier does NOT move.
+        const dossier = await loadDossier(db, project.id, action.subjectId);
+        if (!dossier) {
+          return NextResponse.json({ error: "No dossier for this subject" }, { status: 400 });
+        }
+
+        const [contact] = await db
+          .select({ id: weddingDossierContacts.id, status: weddingDossierContacts.status, note: weddingDossierContacts.note })
+          .from(weddingDossierContacts)
+          .where(
+            and(
+              eq(weddingDossierContacts.dossierId, dossier.id),
+              eq(weddingDossierContacts.id, action.contactId),
+            ),
+          )
+          .limit(1);
+
+        if (!contact) {
+          return NextResponse.json({ error: "Unknown contact" }, { status: 400 });
+        }
+        // Strict sequence: selection → contacte → confirme. No intermediate
+        // "answered" status exists, and a confirmation can only be declared
+        // on an attested contact.
+        if (contact.status === "selectionne") {
+          return NextResponse.json({ error: "Contact is not attested yet" }, { status: 400 });
+        }
+        if (contact.status === "confirme") {
+          return NextResponse.json({ error: "Contact already confirmed" }, { status: 400 });
+        }
+
+        await db
+          .update(weddingDossierContacts)
+          .set({
+            status: "confirme",
+            note: action.note ?? contact.note,
+            confirmedAt: sql`now()`,
+            updatedAt: sql`now()`,
+          })
+          .where(eq(weddingDossierContacts.id, contact.id));
       } else if (action.action === "contact-remove") {
         // Removing a person never rewrites history: the dossier keeps its
         // state (the couple may go back via Inspiration/Selection — a human

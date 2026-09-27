@@ -104,6 +104,15 @@ export const weddingDossierContacts = pgTable(
     declaredRole: text("declared_role"),
     status: text("status").notNull().default("selectionne"),
     note: text("note"),
+    /**
+     * B1: REAL persistent timestamps — never a substitute via updated_at.
+     * attested_at = when the couple declared they made contact;
+     * confirmed_at = when the couple declared the professional confirmed
+     * (a declaration BY the couple — WEDMAG has no channel to collect the
+     * professional's answer and verifies nothing).
+     */
+    attestedAt: timestamp("attested_at", { withTimezone: true }),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

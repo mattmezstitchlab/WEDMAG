@@ -172,6 +172,27 @@ test("contact-attest carries an optional, bounded note", () => {
   }
 });
 
+test("contact-confirm carries an optional, bounded note like contact-attest", () => {
+  assert.deepEqual(parse({ action: "contact-confirm", subjectId: "photographe", contactId: "uuid-1", note: "  Il nous a confirmé  " }), {
+    ok: true,
+    request: { action: "contact-confirm", subjectId: "photographe", contactId: "uuid-1", note: "Il nous a confirmé" },
+  });
+  assert.deepEqual(parse({ action: "contact-confirm", subjectId: "photographe", contactId: "uuid-1" }), {
+    ok: true,
+    request: { action: "contact-confirm", subjectId: "photographe", contactId: "uuid-1", note: null },
+  });
+  for (const [label, body, error] of [
+    ["without contactId", { action: "contact-confirm", subjectId: "photographe" }, "contactId is required"],
+    ["with an oversized note", { action: "contact-confirm", subjectId: "photographe", contactId: "uuid-1", note: "n".repeat(501) }, "note is too long"],
+    ["with a non-string note", { action: "contact-confirm", subjectId: "photographe", contactId: "uuid-1", note: 42 }, "Invalid note"],
+    ["with an oversized contactId", { action: "contact-confirm", subjectId: "photographe", contactId: "c".repeat(65) }, "contactId is too long"],
+  ] as const) {
+    const result = parse(body);
+    assert.equal(result.ok, false, label);
+    assert.equal(result.error, error);
+  }
+});
+
 test("contact actions validate the subjectId against the catalogue like every other action", () => {
   for (const action of ["contact-add", "contact-attest", "contact-remove"]) {
     const result = parse({ action, subjectId: "inexistant", contactId: "uuid-1" });

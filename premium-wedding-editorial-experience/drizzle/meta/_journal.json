@@ -43,6 +43,13 @@
       "when": 1790526724334,
       "tag": "0005_mysterious_agent_zero",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790533275985,
+      "tag": "0006_dizzy_hannibal_king",
+      "breakpoints": true
     }
   ]
 }

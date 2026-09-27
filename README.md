@@ -83,8 +83,14 @@ global person registry: contacts exist only inside their dossier (no CRM).
 {`subjectId`, `contactId`, `note`?} records the couple's declaration and
 moves the dossier to the contact state in one atomic transaction — WEDMAG
 records the declaration, it verifies and certifies nothing;
-`contact-remove` removes the person without rewriting the dossier's
-history. See
+`contact-confirm` (B1) records the couple's declaration that the
+professional confirmed (`selection → contacte → confirme`, strict
+sequence) with its own real timestamp — again the couple's words, never
+a verified fact, never a contract, and it never touches the dossier's
+state; `contact-remove` removes the person (including a confirmed one)
+without rewriting the dossier's history. Both moments carry persistent
+timestamps (`attestedAt`, `confirmedAt` — real columns, never a
+substitute via `updatedAt`). See
 [`PACTE-MARIAGE.md`](../PACTE-MARIAGE.md) and
 [`WEDMAG-DOSSIERS.md`](../WEDMAG-DOSSIERS.md).
 

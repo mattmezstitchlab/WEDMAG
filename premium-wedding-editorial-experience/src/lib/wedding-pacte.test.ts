@@ -255,8 +255,8 @@ test("normalizeWeddingState repairs invalid contacts and drops identity-less row
         source: "wedmag",
         parcoursProgress: 2,
         contacts: [
-          { id: "uuid-1", professionalRef: "photographe:camille-novae", declaredName: null, declaredRole: null, status: "contacte", note: "  Rencontre  ", attestedAt: "2026-09-27T10:00:00.000Z" },
-          { id: "uuid-2", professionalRef: null, declaredName: "  Marie Dupont  ", declaredRole: "", status: "bogus", note: 42, attestedAt: 42 },
+          { id: "uuid-1", professionalRef: "photographe:camille-novae", declaredName: null, declaredRole: null, status: "confirme", note: "  Rencontre  ", attestedAt: "2026-09-27T10:00:00.000Z", confirmedAt: "2026-09-28T10:00:00.000Z" },
+          { id: "uuid-2", professionalRef: null, declaredName: "  Marie Dupont  ", declaredRole: "", status: "bogus", note: 42, attestedAt: 42, confirmedAt: 42 },
           { id: null, professionalRef: null, declaredName: "   ", status: "selectionne" },
           "pas-un-contact",
         ],
@@ -264,8 +264,8 @@ test("normalizeWeddingState repairs invalid contacts and drops identity-less row
     },
   });
   assert.deepEqual(normalized?.dossiers.photographe.contacts, [
-    { id: "uuid-1", professionalRef: "photographe:camille-novae", declaredName: null, declaredRole: null, status: "contacte", note: "Rencontre", attestedAt: "2026-09-27T10:00:00.000Z" },
-    { id: "uuid-2", professionalRef: null, declaredName: "Marie Dupont", declaredRole: null, status: "selectionne", note: null, attestedAt: null },
+    { id: "uuid-1", professionalRef: "photographe:camille-novae", declaredName: null, declaredRole: null, status: "confirme", note: "Rencontre", attestedAt: "2026-09-27T10:00:00.000Z", confirmedAt: "2026-09-28T10:00:00.000Z" },
+    { id: "uuid-2", professionalRef: null, declaredName: "Marie Dupont", declaredRole: null, status: "selectionne", note: null, attestedAt: null, confirmedAt: null },
   ]);
   // An older mirror without contacts gains an empty list — never invented.
   const upgraded = normalizeWeddingState({ name: "Mon mariage", items: { dj: { source: "wedmag" } } });

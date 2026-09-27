@@ -129,8 +129,14 @@ export type DossierContact = {
   declaredRole: string | null;
   status: ContactStatus;
   note: string | null;
-  /** When the couple declared the contact (server updatedAt at attestation). */
+  /** When the couple declared the contact (real column since B1). */
   attestedAt?: string | null;
+  /**
+   * When the couple declared the professional confirmed (B1). This is the
+   * couple's declaration — WEDMAG has no channel to collect the
+   * professional's answer and certifies nothing.
+   */
+  confirmedAt?: string | null;
 };
 
 /**
@@ -244,6 +250,7 @@ function normalizeDossierContacts(value: unknown): DossierContact[] {
       status?: unknown;
       note?: unknown;
       attestedAt?: unknown;
+      confirmedAt?: unknown;
     };
     const professionalRef =
       typeof contact.professionalRef === "string" && contact.professionalRef.length > 0
@@ -266,6 +273,8 @@ function normalizeDossierContacts(value: unknown): DossierContact[] {
       note: typeof contact.note === "string" && contact.note.trim().length > 0 ? contact.note.trim() : null,
       attestedAt:
         typeof contact.attestedAt === "string" && contact.attestedAt.length > 0 ? contact.attestedAt : null,
+      confirmedAt:
+        typeof contact.confirmedAt === "string" && contact.confirmedAt.length > 0 ? contact.confirmedAt : null,
     });
   }
   return contacts;

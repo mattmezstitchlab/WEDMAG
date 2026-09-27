@@ -809,3 +809,310 @@ l'audit devait être jugé insuffisant, aucun code ne sera écrit.
   Récupération : fetch origin, `git reset 5b3bad6` sans toucher à l'arbre
   de travail, réinstallation des dépendances — état vérifié par typecheck
   et 102/102 tests avant de reprendre l'implémentation.
+
+# PHASE B — CONFIRMATION & DÉCISION — AUDIT
+
+Statut : **audit validé (7 points) puis B1 implémentée et vérifiée**
+(vérifications en fin de section). Base : dbb095d → commit dédié.
+B2 : NON commencée (ordre impératif respecté).
+
+Objectif : faire évoluer SÉLECTION → CONTACT → CONFIRMÉ sans transformer
+WEDMAG en CRM, marketplace ou logiciel de gestion commerciale.
+
+## Les 8 distinctions demandées — cartographie factuelle
+
+| # | Concept | Où il vit aujourd'hui | État |
+|---|---|---|---|
+| 1 | découvert dans le magazine | nulle part (implicite catalogue) | Phase A : décision tenue — aucune ligne, jamais de tracking de découvertes |
+| 2 | sélectionné | `contact.status = selectionne` | Phase A ✅ |
+| 3 | contacté | `contact.status = contacte` (déclaration du couple, horodatée) | Phase A ✅ |
+| 4 | ayant répondu | **aucune représentation** | à trancher (voir À VALIDER n°4) |
+| 5 | proposition reçue | aucun objet | B2 |
+| 6 | proposition acceptée/refusée | aucun objet, aucune décision enregistrée | B2 |
+| 7 | confirmé | `contact.status = confirme` (modélisé, réservé) | **B1** |
+| 8 | engagement contractuel | `dossier.state ∈ engagement/contrat/confirme` (modélisés, réservés) | futur (C) — exige des documents |
+
+**Découverte d'audit n°1 — le piège du mot « confirmé »** : deux
+sémantiques distinctes le portent déjà dans le code.
+`contact.status = confirme` = *le professionnel a répondu favorablement*
+(niveau de la personne, c'est le CONFIRMÉ de SÉLECTION → CONTACT →
+CONFIRMÉ) ; `dossier.state = confirme` = *dossier confirmé*, étape
+**post-contrat** du cycle de vie (l'ordre modélisé est contact →
+proposition → engagement → contrat → confirme). Ce ne sont PAS le même
+fait. Conséquence : **B1 ne doit jamais déplacer l'état du dossier** —
+la progression demandée vit au niveau du contact.
+
+**Découverte d'audit n°2 — la date d'attestation ne survit pas à une
+deuxième transition** : le GET dérive `attestedAt` par
+`case when status = 'contacte' then updated_at else null end`. Le jour
+où un contact passe à `confirme`, cette dérivation perd la date
+d'attestation. Le fait horodaté doit donc devenir une colonne réelle
+(voir modèle minimal) — c'est la seule dette que la Phase A a laissée
+dans ce périmètre, par construction volontairement minimaliste.
+
+## 1. État actuel réel du code
+
+**Ce que la Phase A permet déjà** : contacts rattachés à `dossier.id`
+(référence catalogue OU personne déclarée) ; statuts selectionne /
+contacte settables, confirme modélisé-réservé ; `contact-attest`
+(déclaration du couple) qui fait passer contact → contacte **et**
+dossier → contact dans une transaction atomique ; `contact-remove` sans
+régression d'état ; GET complet (statut, note, attestedAt ISO) ;
+isolation session → projet → dossier → contact prouvée en runtime.
+
+**Ce qui manque réellement** : toute représentation de la réponse du
+professionnel (confirme est inatteignable) ; un horodatage stable de
+l'attestation au-delà de contacte (découverte n°2) ; tout objet
+proposition ; toute trace de décision.
+
+**Réutilisable sans duplication** : `dossier.id` (ancre), la table
+`wedding_dossier_contacts`, le pattern « vocabulaire modélisé /
+exposition progressive », le pattern d'action déclarative avec
+transaction (calque de `contact-attest`), la validation stricte, le
+câblage GET/client (normalisation + fusion), et deux vocabulaires déjà
+modélisés : `contactStatuses` (confirme) et les états dossier
+proposition/engagement/contrat/confirme.
+
+## 2. Modèle minimal (B1 — CONFIRMATION uniquement)
+
+- **Aucune nouvelle table. Aucun nouvel objet.** La confirmation est un
+  changement d'état du CONTACT existant — le « professionnel ayant
+  répondu » n'est pas une nouvelle entité.
+- **2 colonnes timestamptz NULL** sur `wedding_dossier_contacts` :
+  `attested_at`, `confirmed_at` — les faits horodatés deviennent stables
+  (répare la découverte n°2). Migration 0006 future (additive) :
+  `ADD COLUMN` ×2 + backfill `attested_at = updated_at WHERE status =
+  'contacte'` pour les lignes existantes. **Non générée à ce stade.**
+- **1 nouvelle action** `contact-confirm {subjectId, contactId, note?}`,
+  déclarée par le couple, calque de `contact-attest` : transition
+  gardée serveur, note optionnelle, `confirmed_at = now()`.
+- GET lit les colonnes réelles ; le client gagne `confirmedAt` dans ses
+  types/miroir (comme Phase A a fait pour attestedAt).
+
+## 3. Sémantique — machine d'états minimale (contact)
+
+```
+selectionne ──(attestation du couple)──> contacte ──(confirmation déclarée)──> confirme
+```
+
+- Séquentiel strict, un seul sens, chaque transition = un geste
+  explicite du couple, horodaté, note optionnelle.
+- `decouvert` reste implicite (jamais stocké — Phase A).
+- Pas de retour arrière : le retrait supprime la ligne ; l'histoire du
+  dossier ne se réécrit jamais (cohérent avec la Phase A).
+- `confirme` est terminal **dans cette phase**.
+- **Le dossier ne bouge pas** : ses états restent inspiration/selection
+  settables + contact via attestation ; proposition et au-delà réservés.
+
+## 4. Source du fait (par transition) — aucune déduction implicite
+
+| Transition | Source du fait | Vérifié ? |
+|---|---|---|
+| → selectionne | geste du couple (ajout) | non |
+| → contacte | **déclaré par le couple** (attestation) | non — WEDMAG enregistre, ne certifie pas |
+| → confirme | **déclaré par le couple** (« le professionnel nous a confirmé ») | non — témoignage du couple, JAMAIS la parole du professionnel |
+| proposition reçue (B2) | déclaré par le couple | non — un document éventuel est hors périmètre |
+| acceptée/refusée (B2) | décision humaine du couple | non |
+| contrat | nécessiterait un document réel | hors périmètre |
+
+**Découverte d'audit n°3** : dans l'architecture actuelle (sessions
+anonymes, aucun canal côté professionnel), **aucun fait ne peut
+provenir du professionnel**. Toute « réponse du professionnel » est en
+réalité *rapportée par le couple*. Le vocabulaire de l'UI doit le
+refléter honnêtement (formulation : « Vous déclarez que ce
+professionnel vous a confirmé. » — jamais « Ce professionnel a
+confirmé » comme fait certifié).
+
+## 5. Propositions
+
+Prématurées en B1. Un objet proposition exigerait de définir : son
+contenu réel (nature, conditions, montant ? — or aucun cadre de prix
+n'existe et la Phase A a posé l'interdiction de stocker prix/
+disponibilité sans données réelles), son cycle de vie (reçue →
+acceptée/refusée → caduque ?), sa relation aux états dossier
+(proposition/engagement). C'est le plus gros apport d'hypothèses du
+périmètre B. L'ancrage est en revanche déjà clair pour B2 : elle
+référencera `contact_id` (le professionnel contacté) ET `dossier_id`.
+
+## 6. Décisions
+
+Enregistrer une décision humaine sans CRM : une décision = **un
+événement déclaré, horodaté, avec note optionnelle, attaché à l'objet
+concerné** — jamais un pipeline, jamais d'étapes assignées, jamais de
+vue de gestion, jamais de scoring. En B1, la confirmation EST la
+première décision enregistrée. En B2, accepter/refuser une proposition
+suivra exactement le même pattern (une action, un sens, une trace).
+
+## 7. Contrat
+
+Le contrat devient pertinent quand existent : une proposition acceptée
+ET un engagement réel documenté (parties, conditions, signature). Ni
+l'un ni l'autre n'existe → **hors périmètre B**. Les états dossier
+engagement/contrat/confirme restent modélisés-réservés. Le jour venu,
+le contrat référencera `dossier.id` et probablement `contact_id` /
+`proposition_id` — l'ancrage est prêt, les données ne le sont pas.
+
+## 8. Parcours
+
+Le parcours est une dérivation PURE du sujet catalogue (aucun couplage
+aux contacts — vérifié : aucune ligne de `buildDossierParcours` ne lit
+les contacts). Nourrir une étape avec un fait réel (ex. « Sélectionner
+des photographes » → détailler les contacts confirmés du dossier) est
+possible sans supposition — ce seraient des données réelles, pas des
+inférences — mais **B1 ne le fait pas** : périmètre minimal, et la
+sémantique de confirmation doit d'abord être validée en production
+d'usage. Proposition pour B2 : les détails d'étape lisent les contacts
+réels comme ils lisent déjà les données catalogue. À valider alors.
+
+## 9. Timeline
+
+Les attestations et confirmations sont des faits du dossier, pas des
+moments du mariage → elles ne s'inscrivent pas dans la Timeline
+(décision Phase A maintenue). Ce qui méritera la Timeline plus tard :
+les **échéances** nées d'un engagement (dégustation, répétition,
+livraison…) — hors périmètre B, et elles s'inscriront DANS la Timeline
+existante, jamais dans un calendrier parallèle. **Aucun ajout
+automatique à ce stade.**
+
+## 10. UX (fiche dossier, section LES PERSONNES)
+
+Après l'attestation existante (statut Contacté + date + note), un seul
+nouveau geste, même grammaire éditoriale : « LE PROFESSIONNEL NOUS A
+CONFIRMÉ » (note optionnelle) → la ligne passe à « Confirmé » avec sa
+date de déclaration et sa note ; la date d'attestation reste affichée
+(le récit complet : contacté le X, confirmé le Y). Aucune vue liste,
+aucun pipeline, aucun tableau ; le select d'état du drawer ne change
+pas (le confirme du DOSSIER reste réservé — autre sémantique, découverte
+n°1). La formulation affiche toujours la déclaration comme telle.
+
+## 11. Sécurité
+
+- Chaîne d'ownership revérifiée à chaque action : session (cookie
+  httpOnly) → projet (unique par session) → dossier (project_id) →
+  contact (dossier_id). `contact-confirm` doit refuser : sans projet
+  (400), dossier inexistant (400), contact inconnu (400), contact hors
+  séquence — pas encore contacté (400), déjà confirmé (400).
+- Manipulation d'état : `set-state` reste borné (inspiration/selection,
+  contact toujours refusé) ; `contact.status` n'est JAMAIS écrit depuis
+  le client — seul le serveur écrit les statuts via les actions
+  dédiées. La validation du payload reste stricte (catalogue, bornes).
+- Isolation inter-sessions : prouvée en runtime Phase A ; B1 hérite du
+  même cheminement (tests runtime prévus identiques).
+
+## 12. Anti-duplication
+
+- B1 : **zéro nouvelle entité** → rien à dupliquer ; 2 colonnes sur une
+  table existante, 1 action sur un mécanisme existant.
+- B2 (proposition) : un nouvel objet, mais par références
+  (`dossier_id`, `contact_id`) — ne duplique ni contacts, ni dossiers,
+  ni parcours, ni Timeline, ni catalogue.
+- Le « professionnel ayant répondu » n'est PAS une entité : c'est le
+  contact existant qui change de statut.
+
+## À VALIDER
+
+1. **B1 d'abord** (recommandation argumentée ci-dessous).
+2. **Séquence stricte** contacte → confirme, ou autoriser
+   selectionne → confirme directement (cas réel : confirmation obtenue
+   sans attestation préalable de contact) ? Recommandation : strict
+   (cohérent avec parcours-step ; le couple atteste le contact d'abord).
+3. **Horodatages réels** : colonnes `attested_at`/`confirmed_at` +
+   backfill (répare la découverte n°2). OK ?
+4. **« Ayant répondu » distinct de « confirmé » ?** Recommandation :
+   non en B1 — une seule déclaration positive (confirme) ; un refus
+   éventuel = retrait du contact (éventuellement avec note avant
+   retrait). Un statut intermédiaire `repondu` doublerait le vocabulaire
+   pour un gain incertain.
+5. **Confirmation révocable ?** Recommandation B1 : non — pas d'état
+   « dé-confirmé » ; le retrait supprime la ligne (l'histoire ne se
+   réécrit pas). À revisiter si l'usage le réclame.
+6. **Formulation UI** : la confirmation est toujours présentée comme
+   déclarée par le couple, jamais comme la parole certifiée du
+   professionnel (découverte n°3). OK ?
+7. **Aucun changement d'état dossier automatique en B1** (découverte
+   n°1). OK ?
+
+## RECOMMANDATION — commencer par B1 (argumentaire factuel)
+
+B1 — CONFIRMATION nécessite moins de nouvelles hypothèses que B2 :
+
+- **zéro nouvelle entité, zéro nouvelle table** (B2 : un objet
+  proposition à définir entièrement) ;
+- **le vocabulaire existe déjà** (`confirme` modélisé et réservé depuis
+  la Phase A — il n'attend que de devenir atteignable) ;
+- **un seul mécanisme nouveau** (`contact-confirm`) qui calque un
+  mécanisme éprouvé (`contact-attest`, transaction atomique) ;
+- les seules questions ouvertes sont de bas niveau (séquence,
+  horodatage, révocation — liste À VALIDER ci-dessus).
+
+B2 — PROPOSITION + DÉCISION empile : la définition du contenu d'une
+proposition (montants ? conditions ? — sans cadre réel, risque
+d'inventer des données), un cycle de vie propre (reçue/acceptée/
+refusée/caduque), une sémantique de décision, et son lien avec les
+états dossier proposition/engagement. Et B2 **dépend logiquement de
+B1** : une proposition réelle vient d'un professionnel contacté, en
+pratique confirmé. Valider d'abord le plus petit fait (la
+confirmation), puis bâtir la proposition dessus.
+
+## B1 — IMPLÉMENTATION (validée puis codée)
+
+Le périmètre exact validé, rien de plus :
+
+- Migration **0006** (additive) : `attested_at`, `confirmed_at`
+  (timestamptz NULL) + **backfill** `attested_at = updated_at WHERE
+  status = 'contacte'` (en Phase A, l'attestation était la seule mise
+  à jour — l'équivalence est exacte, prouvée par écart 0 s en test).
+  Fin de la dérivation `case when` : les deux moments sont des
+  colonnes réelles, jamais un substitut par `updated_at`.
+- Action `contact-confirm {subjectId, contactId, note?}` : déclaration
+  du couple (« vous déclarez que ce professionnel a confirmé » — la
+  formulation de l'UI et du toast est celle-ci, jamais une preuve
+  certifiée). Séquence stricte serveur : `selectionne` → 400 « Contact
+  is not attested yet » ; `contacte` → confirme + `confirmed_at =
+  now()` ; `confirme` → 400 « Contact already confirmed ». **Aucun
+  statut intermédiaire « a répondu ».**
+- **`confirme` ne touche jamais `dossier.state`** : le statut du
+  contact et l'état du dossier restent deux faits distincts (le
+  `confirme` du DOSSIER reste un état réservé post-contrat, autre
+  sémantique).
+- Retrait d'un contact confirmé : autorisé (geste explicite), aucune
+  régression automatique du dossier.
+- Client : `confirmedAt` dans types/miroir/normalisation ; UI « LES
+  PERSONNES » — sur un contact attesté, un seul nouveau geste « LE
+  PROFESSIONNEL NOUS A CONFIRMÉ » (note optionnelle) ; sur un contact
+  confirmé, le récit complet honnête : contact déclaré le X,
+  confirmation déclarée le Y, note.
+- Hors périmètre B1 respecté : aucune proposition, prix, devis,
+  contrat, paiement, document, échéance, décision commerciale,
+  Timeline, adaptation du parcours, registre global, CRM.
+
+## VÉRIFICATIONS (B1, exécutées)
+
+- Lint, typecheck, tests **123/123** (121 précédents intacts — la
+  Phase A n'est modifiée que par les adaptations strictement
+  nécessaires aux horodatages : lecture des colonnes réelles au lieu
+  de la dérivation, champ confirmAt dans types/normalisation ; +2
+  nouveaux : validation contact-confirm, route local_only), build
+  sans DATABASE_URL.
+- **Migrations** sur PostgreSQL 18.4 : 0000→0006 depuis zéro (colonnes
+  présentes, NULL autorisés) ; **chemin de mise à niveau avec données
+  Phase A** : base pré-0006 + contact `contacte` (attesté il y a 3 j)
+  + contact `selectionne` → 0006 appliquée seule, **backfill exact**
+  (attested_at = updated_at, écart 0 s), selectionne non backfillé,
+  confirmed_at NULL partout, dossier intact.
+- **Scénario réel PostgreSQL** : confirm sur `selectionne` → 400 «
+  Contact is not attested yet » ; attest → attestedAt réel (ISO) ;
+  confirm → `confirme` + confirmedAt + **attestedAt préservé** (la
+  dette de la découverte n°2 est réparée) + **dossier.state inchangé**
+  (reste `contact`, jamais `confirme`-dossier) ; double confirm → 400
+  ; attest sur confirmé → 400 ; contactId inconnu → 400 ; sans dossier
+  → 400 ; set-state contact ET proposition → toujours 400 ; retrait du
+  confirmé → ok, aucune régression d'état ; **isolation stricte**
+  (session B : 0 dossier, contact de A inatteignable) ; parcours-step
+  intact.
+- Chemin 503 : confirm → 503 unavailable, GET avec session → 503,
+  GET / → 200, validation contactId → 400 avant la base.
+- local_only : confirm → `{ ok: true, persistence: "local_only" }` ;
+  strings UI B1 présentes dans le bundle client.
+- Moon Phase : **aucun code** — reste sur son audit validé
+  (MOON-PHASE.md), produit séparé, jusqu'à nouvel ordre.

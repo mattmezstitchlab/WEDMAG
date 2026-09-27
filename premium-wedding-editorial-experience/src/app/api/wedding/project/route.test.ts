@@ -143,6 +143,16 @@ test("POST contact-add refuses a nameless declared contact with 400", async () =
   assert.deepEqual(await response.json(), { error: "name is required" });
 });
 
+test("POST contact-confirm answers honestly in local_only and validates its payload", async () => {
+  const confirm = await post({ action: "contact-confirm", subjectId: "photographe", contactId: "uuid-1", note: "Il nous a confirmé" });
+  assert.equal(confirm.status, 200);
+  assert.deepEqual(await confirm.json(), { ok: true, persistence: "local_only" });
+
+  const missing = await post({ action: "contact-confirm", subjectId: "photographe" });
+  assert.equal(missing.status, 400);
+  assert.deepEqual(await missing.json(), { error: "contactId is required" });
+});
+
 test("POST contact-attest requires a contactId with 400", async () => {
   const response = await post({ action: "contact-attest", subjectId: "photographe" });
   assert.equal(response.status, 400);

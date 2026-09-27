@@ -46,6 +46,7 @@ export type ProjectRequest =
       role: string | null;
     }
   | { action: "contact-attest"; subjectId: string; contactId: string; note: string | null }
+  | { action: "contact-confirm"; subjectId: string; contactId: string; note: string | null }
   | { action: "contact-remove"; subjectId: string; contactId: string };
 
 export type ProjectRequestParse =
@@ -135,7 +136,7 @@ export function parseProjectRequest(body: unknown): ProjectRequestParse {
     return { ok: true, request: { action, subjectId: check.subjectId } };
   }
 
-  if (action === "contact-add" || action === "contact-attest" || action === "contact-remove") {
+  if (action === "contact-add" || action === "contact-attest" || action === "contact-confirm" || action === "contact-remove") {
     const check = validateSubjectId(subjectId);
 
     if (!check.ok) {
@@ -199,7 +200,8 @@ export function parseProjectRequest(body: unknown): ProjectRequestParse {
       };
     }
 
-    // contact-attest / contact-remove: both address an existing contact.
+    // contact-attest / contact-confirm / contact-remove: all address an
+    // existing contact. attest and confirm carry the same optional note.
     if (typeof contactId !== "string" || contactId.trim().length === 0) {
       return { ok: false, error: "contactId is required" };
     }
@@ -208,7 +210,7 @@ export function parseProjectRequest(body: unknown): ProjectRequestParse {
       return { ok: false, error: "contactId is too long" };
     }
 
-    if (action === "contact-attest") {
+    if (action === "contact-attest" || action === "contact-confirm") {
       if (note !== undefined && note !== null && typeof note !== "string") {
         return { ok: false, error: "Invalid note" };
       }
@@ -219,7 +221,7 @@ export function parseProjectRequest(body: unknown): ProjectRequestParse {
       return {
         ok: true,
         request: {
-          action: "contact-attest",
+          action,
           subjectId: check.subjectId,
           contactId: trimmedContactId,
           note: trimmedNote.length > 0 ? trimmedNote : null,
